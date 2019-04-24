@@ -1,0 +1,17 @@
+*~
+*.o
+*.d
+*.elf
+*.bin
+*.swp
+*.swo
+build
+.env
+.vscode
+test/analyzer.csv
+test/csr.csv
+.idea/
+__pycache__/
+pycharm.env
+*.upl
+*.vcd
