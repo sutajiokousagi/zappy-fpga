@@ -327,7 +327,7 @@ class ZappySoC(SoCCore):
         kwargs['cpu_reset_address']=self.mem_map["spiflash"]+boot_offset
         SoCCore.__init__(self, platform, clk_freq,
                          integrated_rom_size=bios_size,
-                         integrated_sram_size=0x20000,
+                         integrated_sram_size=0x30000,
                          ident="Zappy LiteX Base SoC",
                          reserve_nmi_interrupt=False,
                          cpu_type="vexriscv",
