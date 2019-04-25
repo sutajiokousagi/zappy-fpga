@@ -259,7 +259,7 @@ class CRG(Module, AutoCSR):
         clk50_distbuf = Signal()
 
         self.specials += [
-            Instance("BUFG", i_I=clk50, o_O=clk50_distbuf),
+            Instance("BUFR", i_I=clk50, o_O=clk50_distbuf),
             # this allows PLLs/MMCMEs to be placed anywhere and reference the input clock
         ]
 
