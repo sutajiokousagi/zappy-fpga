@@ -5,6 +5,7 @@
 *.bin
 *.swp
 *.swo
+*.map
 build
 .env
 .vscode
