@@ -29,6 +29,11 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 
+from liteeth.common import *
+from liteeth.phy.rmii import LiteEthPHYRMII
+from liteeth.core import LiteEthUDPIPCore
+from liteeth.frontend.etherbone import LiteEthEtherbone
+
 _io = [
     # ADCs
     ("fadc", 0,
@@ -196,14 +201,68 @@ _io = [
     # ("drv_row2", 0, Pins("K12"), IOStandard("LVCMOS33")),
     # ("drv_row3", 0, Pins("A2"), IOStandard("LVCMOS33")),
     # ("drv_row4", 0, Pins("L13"), IOStandard("LVCMOS33")),
+]
 
+# subset of NeTV2 for testing of code before Zappy boards are back from fab
+_io_netv2 = [
+    ("clk50", 0, Pins("J19"), IOStandard("LVCMOS33")),
+
+    ("blinkenlight0", 0, Pins("M21"), IOStandard("LVCMOS33")),
+    #("blinkenlight1", 0, Pins("N20"), IOStandard("LVCMOS33")),
+    ("blinkenlight1", 0, Pins("L21"), IOStandard("LVCMOS33")),
+    #("fpga_led3", 0, Pins("AA21"), IOStandard("LVCMOS33")),
+    ("blinkenlight2", 0, Pins("R19"), IOStandard("LVCMOS33")),
+    #("fpga_led5", 0, Pins("M16"), IOStandard("LVCMOS33")),
+    ("fan_pwm", 0, Pins("L14"), IOStandard("LVCMOS33")),
+
+    ("serial", 0,
+        Subsignal("tx", Pins("E14")),
+        Subsignal("rx", Pins("E13")),
+        IOStandard("LVCMOS33"),
+    ),
+
+    # RMII PHY Pads
+    ("rmii_eth_clocks", 0,
+     Subsignal("ref_clk", Pins("D17"), IOStandard("LVCMOS33"))
+     ),
+    ("rmii_eth", 0,
+     Subsignal("rst_n", Pins("F16"), IOStandard("LVCMOS33")),
+     Subsignal("rx_data", Pins("A20 B18"), IOStandard("LVCMOS33")),
+     Subsignal("crs_dv", Pins("C20"), IOStandard("LVCMOS33")),
+     Subsignal("tx_en", Pins("A19"), IOStandard("LVCMOS33")),
+     Subsignal("tx_data", Pins("C18 C19"), IOStandard("LVCMOS33")),
+     Subsignal("mdc", Pins("F14"), IOStandard("LVCMOS33")),
+     Subsignal("mdio", Pins("F13"), IOStandard("LVCMOS33")),
+     Subsignal("rx_er", Pins("B20"), IOStandard("LVCMOS33")),
+     Subsignal("int_n", Pins("D21"), IOStandard("LVCMOS33")),
+     ),
+
+    # SPI Flash
+    ("spiflash_4x", 0,  # clock needs to be accessed through STARTUPE2
+     Subsignal("cs_n", Pins("T19")),
+     Subsignal("dq", Pins("P22", "R22", "P21", "R21")),
+     IOStandard("LVCMOS33")
+     ),
+    ("spiflash_1x", 0,  # clock needs to be accessed through STARTUPE2
+     Subsignal("cs_n", Pins("T19")),
+     Subsignal("mosi", Pins("P22")),
+     Subsignal("miso", Pins("R22")),
+     Subsignal("wp", Pins("P21")),
+     Subsignal("hold", Pins("R21")),
+     IOStandard("LVCMOS33")
+     ),
 ]
 
 class Platform(XilinxPlatform):
-    def __init__(self, toolchain="vivado", programmer="vivado"):
-        part = "xc7s50ftgb196-2"
-        XilinxPlatform.__init__(self, part, _io,
-                                toolchain=toolchain)
+    def __init__(self, toolchain="vivado", programmer="vivado", board="zappy"):
+        if board == "zappy":
+            part = "xc7s50ftgb196-2"
+            XilinxPlatform.__init__(self, part, _io,
+                                    toolchain=toolchain)
+        elif board == "netv2":
+            part = "xc7a100t-fgg484-2"
+            XilinxPlatform.__init__(self, part, _io_netv2,
+                                    toolchain=toolchain)
 
         # NOTE: to do quad-SPI mode, the QE bit has to be set in the SPINOR status register
         # OpenOCD won't do this natively, have to find a work-around (like using iMPACT to set it once)
@@ -245,6 +304,8 @@ class CRG(Module, AutoCSR):
         rst = Signal()
         self.clock_domains.cd_sys = ClockDomain()
 
+        self.clock_domains.cd_eth = ClockDomain()
+
         # DRP
         self._mmcm_read = CSR()
         self._mmcm_write = CSR()
@@ -256,6 +317,7 @@ class CRG(Module, AutoCSR):
         pll_locked = Signal()
         pll_fb = Signal()
         pll_sys = Signal()
+        pll_clk50 = Signal()
         clk50_distbuf = Signal()
 
         self.specials += [
@@ -279,6 +341,10 @@ class CRG(Module, AutoCSR):
                      p_CLKOUT0_DIVIDE_F=8, p_CLKOUT0_PHASE=0.0,
                      o_CLKOUT0=pll_sys,
 
+                     # 50 MHz - clk50 distribution buffer
+                     p_CLKOUT4_DIVIDE=16, p_CLKOUT4_PHASE=0.0,
+                     o_CLKOUT4=pll_clk50,
+
                      # DRP
                      i_DCLK=ClockSignal(),
                      i_DWE=self._mmcm_write.re,
@@ -294,8 +360,10 @@ class CRG(Module, AutoCSR):
 
             # global distribution buffers
             Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
+            Instance("BUFG", i_I=pll_clk50, o_O=self.cd_eth.clk),
 
             AsyncResetSynchronizer(self.cd_sys, rst | ~pll_locked),
+            AsyncResetSynchronizer(self.cd_eth, ~pll_locked | rst),
         ]
         self.sync += [
             If(self._mmcm_read.re | self._mmcm_write.re,
@@ -304,6 +372,7 @@ class CRG(Module, AutoCSR):
                       self._mmcm_drdy.status.eq(1)
                       )
         ]
+
 
 boot_offset = 0x1000000
 bios_size = 0x8000
@@ -327,7 +396,7 @@ class ZappySoC(SoCCore):
         kwargs['cpu_reset_address']=self.mem_map["spiflash"]+boot_offset
         SoCCore.__init__(self, platform, clk_freq,
                          integrated_rom_size=bios_size,
-                         integrated_sram_size=0x30000,
+                         integrated_sram_size=0x20000,
                          ident="Zappy LiteX Base SoC",
                          reserve_nmi_interrupt=False,
                          cpu_type="vexriscv",
@@ -356,11 +425,34 @@ class ZappySoC(SoCCore):
         self.add_memory_region(
             "spiflash", self.mem_map["spiflash"] | self.shadow_base, 8*1024*1024)
 
-        self.flash_boot_address = 0x207b0000  # TODO: this is from XC100T
+        self.flash_boot_address = 0x207b0000
 
         self.platform.add_platform_command(
             "create_clock -name clk50 -period 20.0 [get_nets clk50]")
 
+        ### ETHERNET
+        phy = LiteEthPHYRMII(platform.request("rmii_eth_clocks"),
+                             platform.request("rmii_eth"))
+        phy = ClockDomainsRenamer("eth")(phy)
+        mac_address = 0x1337320dbabe
+        ip_address = "10.0.11.2"
+        core = LiteEthUDPIPCore(phy, mac_address, convert_ip(ip_address), int(50e6), with_icmp=True)
+        core = ClockDomainsRenamer("eth")(core)
+        self.submodules += phy, core
+
+        etherbone_cd = ClockDomain("etherbone")
+        self.clock_domains += etherbone_cd
+        self.comb += [
+            etherbone_cd.clk.eq(ClockSignal("sys")),
+            etherbone_cd.rst.eq(ResetSignal("sys"))
+        ]
+        self.submodules.etherbone = LiteEthEtherbone(core.udp, 1234, mode="master", cd="etherbone")
+        self.add_wb_master(self.etherbone.wishbone.bus)
+
+        self.platform.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.crg.cd_eth.clk
+        )
 
 """
         # SPI for flash already added above
@@ -381,7 +473,7 @@ class ZappySoC(SoCCore):
         self.comb += self.ev.my_int1.trigger.eq(platform.request("int", 0).int)
 
 """
-        
+
 
 
 def main():
@@ -391,13 +483,18 @@ def main():
 
     parser = argparse.ArgumentParser(description="Build Zappy bitstream and firmware")
     parser.add_argument(
-        "-t", "--target", help="which FPGA environment to build for", choices=["zappy"], default="zappy"
+        "-t", "--target", help="which FPGA board to build for", choices=["zappy", "netv2"], default="zappy"
     )
     args = parser.parse_args()
 
-    platform = Platform()
     if args.target == "zappy":
-        soc = ZappySoC(platform)
+        platform = Platform()
+    elif args.target == "netv2":
+        platform = Platform(board="netv2")
+    else:
+        exit(1)
+
+    soc = ZappySoC(platform)
     builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv")
     vns = builder.build()
     soc.do_exit(vns)
