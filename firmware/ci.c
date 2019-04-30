@@ -8,7 +8,7 @@
 #include <generated/mem.h>
 #include <time.h>
 #include <console.h>
-#include "flags.h"
+#include <hw/flags.h>
 
 #include <irq.h>
 

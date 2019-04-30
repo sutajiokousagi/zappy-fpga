@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,42 +8,50 @@
 #include <time.h>
 #include <generated/csr.h>
 #include <generated/mem.h>
-#include "flags.h"
+#include <hw/flags.h>
 #include <console.h>
 #include <system.h>
 
 #include "ci.h"
 #include "processor.h"
+#include "etherbone.h"
+#include "ethernet.h"
+#include "telnet.h"
+#include "uptime.h"
+#include "mdio.h"
+#include "version.h"
 
-void __stack_chk_fail(void);
-void * __stack_chk_guard = (void *) (0xDEADBEEF);
-void __stack_chk_fail(void) {
-  printf( "stack fail\n" );
-}
+unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
+unsigned char ip_addr[4] = {10, 0, 11, 2};
 
-int main(void)
-{
-	irq_setmask(0);
-	irq_setie(1);
-	uart_init();
+int main(void) {
+  telnet_active = 0;
+  irq_setmask(0);
+  irq_setie(1);
+  uart_init();
 
-	puts("\nZappy software built "__DATE__" "__TIME__);
+  puts("Zappy firmware booting...\n");
 
-	time_init();
+  time_init();
+  print_version();
+  mdio_status();
 
-	processor_init();
-	processor_update();
-	processor_start();
+  // Setup the Ethernet
+  ethernet_init(mac_addr, ip_addr);
+  etherbone_init();
+  telnet_init();
+  
+  processor_init();
+  processor_start();
 
-	ci_prompt();
+  ci_prompt();
+  
+  while(1) {
+    uptime_service();
+    processor_service();
+    ci_service();
+    ethernet_service();
+  }
 
-	int wait_event;
-	elapsed(&wait_event, SYSTEM_CLOCK_FREQUENCY);
-	
-	while(1) {
-	  processor_service();
-	  ci_service();
-	}
-
-	return 0;
+  return 0;
 }

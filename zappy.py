@@ -23,6 +23,7 @@ from litex.build.xilinx import XilinxPlatform, VivadoProgrammer
 from litex.soc.integration.builder import *
 
 from litex.soc.cores import spi_flash
+from litex.soc.cores import dna, xadc
 
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
@@ -32,7 +33,11 @@ from litex.soc.interconnect.csr_eventmanager import *
 from liteeth.common import *
 from liteeth.phy.rmii import LiteEthPHYRMII
 from liteeth.core import LiteEthUDPIPCore
+from liteeth.core.mac import LiteEthMAC
 from liteeth.frontend.etherbone import LiteEthEtherbone
+
+from gateware.info import git
+from gateware import led
 
 _io = [
     # ADCs
@@ -84,14 +89,14 @@ _io = [
     ("drv_rdis", 0, Pins("A5"), IOStandard("LVCMOS33")),
 
     # other GPIOs
-    ("blinkenlight0", 0, Pins("M13"), IOStandard("LVCMOS33")),
-    ("blinkenlight1", 0, Pins("N14"), IOStandard("LVCMOS33")),
-    ("blinkenlight2", 0, Pins("J1"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 0, Pins("M13"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 1, Pins("N14"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 2, Pins("J1"), IOStandard("LVCMOS33")),
 
-    ("noplate0", 0, Pins("H12"), IOStandard("LVCMOS33")),
-    ("noplate1", 0, Pins("L14"), IOStandard("LVCMOS33")),
-    ("noplate2", 0, Pins("M14"), IOStandard("LVCMOS33")),
-    ("noplate3", 0, Pins("D4"), IOStandard("LVCMOS33")),
+    ("noplate", 0, Pins("H12"), IOStandard("LVCMOS33")),
+    ("noplate", 1, Pins("L14"), IOStandard("LVCMOS33")),
+    ("noplate", 2, Pins("M14"), IOStandard("LVCMOS33")),
+    ("noplate", 3, Pins("D4"), IOStandard("LVCMOS33")),
 
     ("fan_pwm", 0, Pins("E12"), IOStandard("LVCMOS33")),
     ("fan_tach", 0, Pins("D13"), IOStandard("LVCMOS33")),
@@ -207,11 +212,11 @@ _io = [
 _io_netv2 = [
     ("clk50", 0, Pins("J19"), IOStandard("LVCMOS33")),
 
-    ("blinkenlight0", 0, Pins("M21"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 0, Pins("M21"), IOStandard("LVCMOS33")),
     #("blinkenlight1", 0, Pins("N20"), IOStandard("LVCMOS33")),
-    ("blinkenlight1", 0, Pins("L21"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 1, Pins("L21"), IOStandard("LVCMOS33")),
     #("fpga_led3", 0, Pins("AA21"), IOStandard("LVCMOS33")),
-    ("blinkenlight2", 0, Pins("R19"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 2, Pins("R19"), IOStandard("LVCMOS33")),
     #("fpga_led5", 0, Pins("M16"), IOStandard("LVCMOS33")),
     ("fan_pwm", 0, Pins("L14"), IOStandard("LVCMOS33")),
 
@@ -375,28 +380,51 @@ class CRG(Module, AutoCSR):
 
 
 boot_offset = 0x1000000
-bios_size = 0x8000
+bios_size = 0x5000
 
 class ZappySoC(SoCCore):
     csr_peripherals = [
         "dna",
         "xadc",
-        "cpu_or_bridge",
+#        "ethcore",
+        "ethphy",
+        "ethmac",
+        "gitinfo",
+        "led"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
+#    csr_map = {
+#        "dna": 8,
+#        "xadc": 9,
+#        "cpu_or_bridge": 10,
+#        "ethcore": 11,
+#        "ethphy": 12,
+#        "ethmac": 13,
+#        "gitinfo": 14,
+#        "led" : 15,
+#    }
+#    csr_map.update(SoCCore.csr_map)
+
+    interrupt_map = {
+        "ethmac": 3,
+    }
+    interrupt_map.update(SoCCore.interrupt_map)
 
     mem_map = {
         "spiflash": 0x20000000,  # (default shadow @0xa0000000)
+        "ethmac": 0x30000000,  # (shadow @0xb0000000)
     }
     mem_map.update(SoCCore.mem_map)
 
     def __init__(self, platform, spiflash="spiflash_1x", **kwargs):
         clk_freq = int(100e6)
 
-        kwargs['cpu_reset_address']=self.mem_map["spiflash"]+boot_offset
+#        self.add_constant("MAIN_RAM_BASE", "SRAM_BASE + 0x10000") # add extra boot memory testing/characterization features to BIOS image
+#        kwargs['cpu_reset_address']=self.mem_map["spiflash"]+boot_offset
         SoCCore.__init__(self, platform, clk_freq,
                          integrated_rom_size=bios_size,
-                         integrated_sram_size=0x20000,
+                         integrated_sram_size=0x4000,  # stack gets put here at runtime (16k stack)
+                         integrated_main_ram_size=0x20000,  # code gets loaded here at runtime
                          ident="Zappy LiteX Base SoC",
                          reserve_nmi_interrupt=False,
                          cpu_type="vexriscv",
@@ -404,6 +432,11 @@ class ZappySoC(SoCCore):
 
         self.submodules.crg = CRG(platform)
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
+
+        self.submodules.dna = dna.DNA()
+        self.submodules.xadc = xadc.XADC()
+        self.submodules.gitinfo = git.GitInfo()
+        self.submodules.leds = led.ClassicLed(Cat(platform.request("blinkenlight", i) for i in range(2)))
 
         # spi flash
         spiflash_pads = platform.request(spiflash)
@@ -431,28 +464,41 @@ class ZappySoC(SoCCore):
             "create_clock -name clk50 -period 20.0 [get_nets clk50]")
 
         ### ETHERNET
-        phy = LiteEthPHYRMII(platform.request("rmii_eth_clocks"),
+        ethphy = LiteEthPHYRMII(platform.request("rmii_eth_clocks"),
                              platform.request("rmii_eth"))
-        phy = ClockDomainsRenamer("eth")(phy)
-        mac_address = 0x1337320dbabe
-        ip_address = "10.0.11.2"
-        core = LiteEthUDPIPCore(phy, mac_address, convert_ip(ip_address), int(50e6), with_icmp=True)
-        core = ClockDomainsRenamer("eth")(core)
-        self.submodules += phy, core
+        self.submodules.ethphy = ethphy = ClockDomainsRenamer("eth")(ethphy)
+#        mac_address = 0x1337320dbabe
+#        ip_address = "10.0.11.2"
+#        ethcore = LiteEthUDPIPCore(ethphy, mac_address, convert_ip(ip_address), int(50e6), with_icmp=True)
+#        self.submodules.ethcore = ethcore = ClockDomainsRenamer("eth")(ethcore)
+        self.submodules.ethmac = LiteEthMAC(phy=self.ethphy, dw=32,
+            interface="wishbone", endianness=self.cpu.endianness)
+        self.add_wb_slave(mem_decoder(self.mem_map["ethmac"]), self.ethmac.bus)
+        self.add_memory_region("ethmac", self.mem_map["ethmac"] | self.shadow_base, 0x2000)
 
-        etherbone_cd = ClockDomain("etherbone")
-        self.clock_domains += etherbone_cd
-        self.comb += [
-            etherbone_cd.clk.eq(ClockSignal("sys")),
-            etherbone_cd.rst.eq(ResetSignal("sys"))
-        ]
-        self.submodules.etherbone = LiteEthEtherbone(core.udp, 1234, mode="master", cd="etherbone")
-        self.add_wb_master(self.etherbone.wishbone.bus)
+#        etherbone_cd = ClockDomain("etherbone")
+#        self.clock_domains += etherbone_cd
+#        self.comb += [
+#            etherbone_cd.clk.eq(ClockSignal("sys")),
+#            etherbone_cd.rst.eq(ResetSignal("sys"))
+#        ]
+#        self.submodules.etherbone = LiteEthEtherbone(ethcore.udp, 1234, mode="master", cd="etherbone")
+#        self.add_wb_master(self.etherbone.wishbone.bus)
 
         self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
             self.crg.cd_eth.clk
         )
+
+        # sys led
+        self.sys_led = Signal()
+        self.comb += platform.request("blinkenlight", 2).eq(self.sys_led)
+        sys_counter = Signal(32)
+        self.sync += sys_counter.eq(sys_counter + 1)
+        self.comb += self.sys_led.eq(sys_counter[26])
+
+        self.fan_pwm = Signal()
+        self.comb += platform.request("fan_pwm", 0).eq(1) # lock the fan to the "on" position
 
 """
         # SPI for flash already added above

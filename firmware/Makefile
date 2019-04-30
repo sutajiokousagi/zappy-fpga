@@ -1,6 +1,6 @@
-NETV2_DIR=../build
+ZAPPY_DIR=../build
 
-include $(NETV2_DIR)/software/include/generated/variables.mak
+include $(ZAPPY_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
 ifeq ($(OS),Windows_NT)
@@ -12,12 +12,21 @@ endif
 OBJECTS=isr.o \
 		processor.o \
 		ci.o \
+		etherbone.o \
+		ethernet.o \
 		i2c.o \
 		main.o \
 		dump.o \
+		mdio.o \
+		uptime.o \
+	        version.o \
+                telnet.o \
+	        version_data.o \
 		stdio_wrap.o
 
-CFLAGS += -I.
+CFLAGS += -I. -I../third_party/libuip -Iuip
+
+include uip/Makefile.mk
 
 all: firmware.bin
 
@@ -31,18 +40,24 @@ ifneq ($(OS),Windows_NT)
 endif
 	$(COPY) $@ boot.bin
 
-firmware.elf: $(OBJECTS)
+firmware.elf: $(OBJECTS)  uip/libuip.a
 	$(LD) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
-		 $(NETV2_DIR)/software/libbase/crt0-$(CPU)-ctr.o \
+		 $(ZAPPY_DIR)/software/libbase/crt0-$(CPU)-ctr.o \
 		$(OBJECTS) \
-		-L$(NETV2_DIR)/software/libbase \
-		-L$(NETV2_DIR)/software/libcompiler_rt \
-		-lbase-nofloat -lcompiler_rt
+		-L$(ZAPPY_DIR)/software/libbase \
+		-L$(ZAPPY_DIR)/software/libcompiler_rt \
+		-lbase-nofloat -lcompiler_rt -Map=firmware.map \
+		-L./uip \
+		-luip
+
 ifneq ($(OS),Windows_NT)
 	chmod -x $@
 endif
+
+uip/libuip.a:
+	$(MAKE) -C uip/
 
 main.o: main.c
 	$(compile)
@@ -58,5 +73,19 @@ load: firmware.bin
 
 clean:
 	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~
+
+# Dependencies on generated files
+version.o: version_data.h version_data.c
+version_data.o: version_data.h version_data.c
+
+# Generated version info
+version_data.h: version_data
+version_data.c: version_data
+version_data:
+	bash ./version_data.sh
+        # Check the version files exist
+	[ -e ./version_data.h ]
+	[ -e ./version_data.c ]
+
 
 .PHONY: all main.o clean load
