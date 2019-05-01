@@ -156,9 +156,19 @@ void ci_service(void)
 	else if(strcmp(token, "uptime") == 0)
 	  uptime_print();
 	else if(strcmp(token, "upload") == 0) {
+	  // send up 1 megabyte of data to benchmark upload speed
 	  unsigned int ip;
 	  ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
-	  tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)0x40000000, 32*1024);
+	  int i;
+	  // send a megabyte
+	  int start, stop;
+	  elapsed(&start, -1);
+	  for( i = 0; i < 32; i++ ) {
+	    tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)0x40000000, 32*1024);
+	  }
+	  elapsed(&stop, -1);
+	  printf("Elapsed ticks for 1MiB: %d, or %dms per megabyte\n",
+		 stop - start, (stop-start)*1000/SYSTEM_CLOCK_FREQUENCY);
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "foo") == 0) {

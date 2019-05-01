@@ -11,6 +11,7 @@
 
 #include "version.h"
 #include "version_data.h"
+#include "ethernet.h"
 
 #define ALIGNMENT 4
 
@@ -44,12 +45,11 @@ void print_board_dna(void) {
 #endif
 }
 
-extern unsigned char *mac_addr;
 void print_board_mac(void) {
   unsigned char *mac = mac_addr;
-  for (int i = 0; i < sizeof(mac); i++) {
+  for (int i = 0; i < sizeof(mac_addr); i++) {
     printf("%02x", mac[i]);
-    if (i != (sizeof(mac)-1))
+    if (i != (sizeof(mac_addr)-1))
       printf(":");
   }
 }
