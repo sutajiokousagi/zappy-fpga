@@ -182,7 +182,8 @@ void ci_service(void)
 	    help_debug();
 	  }
 	} else {
-	  printf("Command not recognized.\n");
+	  if( strlen(token) > 0 )
+	    printf("Command %s not recognized.\n", token);
 	}
 	if( !was_dummy ) {
 	  ci_prompt();
