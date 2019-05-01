@@ -167,8 +167,10 @@ void ci_service(void)
 	    tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)0x40000000, 32*1024);
 	  }
 	  elapsed(&stop, -1);
+	  i = stop - start;
+	  if( i < 0 ) i += timer0_reload_read();
 	  printf("Elapsed ticks for 1MiB: %d, or %dms per megabyte\n",
-		 stop - start, (stop-start)*1000/SYSTEM_CLOCK_FREQUENCY);
+		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "foo") == 0) {
@@ -180,7 +182,7 @@ void ci_service(void)
 	    help_debug();
 	  }
 	} else {
-	  
+	  printf("Command not recognized.\n");
 	}
 	if( !was_dummy ) {
 	  ci_prompt();
