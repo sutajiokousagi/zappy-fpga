@@ -3,6 +3,12 @@ include $(SOC_DIRECTORY)/software/common.mak
 
 OBJECTS=microudp.o tftp.o
 
+ifeq (yes,$(USE_UIP))
+	CFLAGS += -DLIBUIP
+endif
+
+CFLAGS += -I. -I../../third_party/libuip -I../uip
+
 all: libnet.a
 
 libnet.a: $(OBJECTS)

@@ -27,7 +27,7 @@ typedef unsigned int uip_stats_t;
 #endif
 
 /* uIP configuration */
-#define UIP_CONF_BYTE_ORDER	UIP_BIG_ENDIAN
+#define UIP_CONF_BYTE_ORDER	UIP_LITTLE_ENDIAN
 #define UIP_CONF_LLH_LEN	14
 #define UIP_CONF_BROADCAST	1
 #define UIP_CONF_LOGGING	1

@@ -21,8 +21,8 @@
 #include "mdio.h"
 #include "version.h"
 
-#include <net/microudp.h>
-#include <net/tftp.h>
+#include "libnet/microudp.h"
+#include "libnet/tftp.h"
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -85,8 +85,14 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 	}
 }
 
+#ifdef LIBUIP
+int arp_mode = ARP_MICROUDP;
+#endif
+
 int main(void) {
-  //  telnet_active = 0;
+#ifdef LIBUIP
+  telnet_active = 0;
+#endif
   irq_setmask(0);
   irq_setie(1);
   uart_init();
@@ -96,15 +102,16 @@ int main(void) {
   print_version();
 
   eth_init(); // must call before time init
+#ifdef LIBUIP
+  clock_init();
+#endif
   time_init();
   
   // Setup the Ethernet
-  //  ethernet_init(mac_addr, my_ip_addr);
-  //  etherbone_init();
-  //  telnet_init();
   unsigned int ip;
-  microudp_start(mac_addr, IPTOINT(my_ip_addr[0], my_ip_addr[1], my_ip_addr[2], my_ip_addr[3]));
-  
+  microudp_start(mac_addr, my_ip_addr[0], my_ip_addr[1], my_ip_addr[2], my_ip_addr[3]);
+
+  // resolve ARP for host
   ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
   printf("Resolving ARP for host at %d.%d.%d.%d...\n",
 	 host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
@@ -112,8 +119,15 @@ int main(void) {
     printf("ARP resolve had unexpected value\n");
   else
     printf("Host resolved!\n");
+
+  // set microudp callback for tftp service
   microudp_set_callback(rx_callback);
   printf( "TFTP service started.\n" );
+
+#ifdef LIBUIP
+  arp_mode = ARP_LIBUIP;
+  telnet_init();
+#endif
   
   processor_init();
   processor_start();
@@ -124,8 +138,17 @@ int main(void) {
     uptime_service();
     processor_service();
     ci_service();
-    //    ethernet_service();
     microudp_service();
+
+#ifdef LIBUIP
+    // for now, just echo the incoming telnet characters to the terminal
+    // but later on, this will be the C&C interface to zappy
+    if( telnet_readchar_nonblock() ) {
+      char c;
+      c = telnet_readchar();
+      putchar(c);
+    }
+#endif
   }
 
   return 0;

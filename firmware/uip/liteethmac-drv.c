@@ -75,6 +75,17 @@ void liteethmac_send(void)
   txlen = MIN(txlen, 1514);
   memcpy(txbuffer, uip_buf, txlen);
   txlen = MAX(txlen, 60);
+
+#if 1  // new code
+  /* fill slot, length and send */
+  ethmac_sram_reader_slot_write(txslot);
+  ethmac_sram_reader_length_write(txlen);
+  ethmac_sram_reader_start_write(1);
+  
+  /* update txslot / txbuffer */
+  txslot = (txslot+1)%ETHMAC_TX_SLOTS;
+  txbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * (ETHMAC_RX_SLOTS + txslot));
+#else
   ethmac_sram_reader_slot_write(txslot);
   ethmac_sram_reader_length_write(txlen);
   while(!(ethmac_sram_reader_ready_read()));
@@ -85,6 +96,7 @@ void liteethmac_send(void)
     txbuffer = txbuffer1;
   else
     txbuffer = txbuffer0;
+#endif
 }
 
 void liteethmac_exit(void)

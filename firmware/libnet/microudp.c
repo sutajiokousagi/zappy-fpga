@@ -9,10 +9,16 @@
 #include <crc.h>
 #include <hw/flags.h>
 
-#include <net/microudp.h>
+#include "microudp.h"
+#include "../ethernet.h"
+
+#ifdef LIBUIP
+#include <time.h>
+#endif
 
 //#define DEBUG_MICROUDP_TX
 //#define DEBUG_MICROUDP_RX
+//#define DEBUG_LIBUIP_RX
 
 #define ETHERTYPE_ARP 0x0806
 #define ETHERTYPE_IP  0x0800
@@ -20,6 +26,7 @@
 #ifdef CSR_ETHMAC_PREAMBLE_CRC_ADDR
 #define HW_PREAMBLE_CRC
 #endif
+
 
 struct ethernet_header {
 #ifndef HW_PREAMBLE_CRC
@@ -75,6 +82,7 @@ struct arp_frame {
 #define IP_TTL			64
 #define IP_PROTO_UDP		0x11
 #define IP_PROTO_ICMP           0x1
+#define IP_PROTO_TCP            0x6
 
 struct ip_header {
 	unsigned char version;
@@ -167,6 +175,32 @@ static unsigned int txslot;
 static unsigned int txlen;
 static ethernet_buffer *txbuffer;
 
+
+#ifdef LIBUIP
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
+static int uip_periodic_event;
+static int uip_periodic_period;
+
+static int uip_arp_event;
+static int uip_arp_period;
+
+static ethernet_buffer *rxbuffer0;
+static ethernet_buffer *rxbuffer1;
+static ethernet_buffer *txbuffer0;
+static ethernet_buffer *txbuffer1;
+
+void uip_log(char *msg)
+{
+#ifdef UIP_DEBUG
+    puts(msg);
+#endif
+}
+
+#endif // LIBUIP
+
+
 static void send_packet(void)
 {
 	/* wait buffer to be available */
@@ -203,6 +237,25 @@ static void send_packet(void)
 	txslot = (txslot+1)%ETHMAC_TX_SLOTS;
 	txbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * (ETHMAC_RX_SLOTS + txslot));
 }
+
+#ifdef LIBUIP
+static void libuip_send(void) {
+  txlen = uip_len;
+  memset(txbuffer, 0, 60);
+  txlen = MIN(txlen, 1514);
+  memcpy(txbuffer, uip_buf, txlen);
+  txlen = MAX(txlen, 60);
+
+  /* fill slot, length and send */
+  ethmac_sram_reader_slot_write(txslot);
+  ethmac_sram_reader_length_write(txlen);
+  ethmac_sram_reader_start_write(1);
+  
+  /* update txslot / txbuffer */
+  txslot = (txslot+1)%ETHMAC_TX_SLOTS;
+  txbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * (ETHMAC_RX_SLOTS + txslot));
+}
+#endif
 
 static unsigned char my_mac[6];
 static unsigned int my_ip;
@@ -393,7 +446,7 @@ int microudp_send(unsigned short src_port, unsigned short dst_port, unsigned int
 }
 
 int microicmp_reply(unsigned short id, unsigned short seq, char *stuff, unsigned short length) {
-  struct pseudo_header h;
+  struct pseudo_header h; // compiler emits warning about this, but we need this variable!
   unsigned int r;
   int i;
 
@@ -443,12 +496,13 @@ int microicmp_reply(unsigned short id, unsigned short seq, char *stuff, unsigned
 
 static udp_callback rx_callback;
 
-static void process_ip(void)
+// returns 0 if we can process
+static int process_ip(void)
 {
-	if(rxlen < (sizeof(struct ethernet_header)+sizeof(struct udp_frame))) return;
+	if(rxlen < (sizeof(struct ethernet_header)+sizeof(struct udp_frame))) return 1;
 	struct udp_frame *udp_ip = &rxbuffer->frame.contents.udp;
 	/* We don't verify UDP and IP checksums and rely on the Ethernet checksum solely */
-	if(udp_ip->ip.version != IP_IPV4) return;
+	if(udp_ip->ip.version != IP_IPV4) return 1;
 	// check disabled for QEMU compatibility
 	//if(rxbuffer->frame.contents.udp.ip.diff_services != 0) return;
 
@@ -458,18 +512,26 @@ static void process_ip(void)
 	    microicmp_reply(ntohs(icmp_ip->icmp.un.echo.id), ntohs(icmp_ip->icmp.un.echo.sequence),
 			    icmp_ip->payload, ntohs(icmp_ip->ip.total_length) - ICMP_OVERHEAD);
 	  }
+	  return 0;
+	} else if( udp_ip->ip.proto == IP_PROTO_TCP ) {
+	  return 1; // can't process TCP frames in this function
 	} else {
-	  if(ntohs(udp_ip->ip.total_length) < sizeof(struct udp_frame)) return;
+	  if(ntohs(udp_ip->ip.total_length) < sizeof(struct udp_frame)) return 1;
 	  // check disabled for QEMU compatibility
 	  //if(ntohs(rxbuffer->frame.contents.udp.ip.fragment_offset) != IP_DONT_FRAGMENT) return;
-	  if(udp_ip->ip.proto != IP_PROTO_UDP) return;
-	  if(ntohl(udp_ip->ip.dst_ip) != my_ip) return;
-	  if(ntohs(udp_ip->udp.length) < sizeof(struct udp_header)) return;
+	  if(udp_ip->ip.proto != IP_PROTO_UDP) return 1;
+	  if(ntohl(udp_ip->ip.dst_ip) != my_ip) return 1;
+	  if(ntohs(udp_ip->udp.length) < sizeof(struct udp_header)) return 1;
 
-	  if(rx_callback)
-	    rx_callback(ntohl(udp_ip->ip.src_ip), ntohs(udp_ip->udp.src_port), ntohs(udp_ip->udp.dst_port),
-			udp_ip->payload, ntohs(udp_ip->udp.length)-sizeof(struct udp_header));
+	  if(rx_callback) {
+	    rx_callback(ntohl(udp_ip->ip.src_ip), ntohs(udp_ip->udp.src_port),
+			ntohs(udp_ip->udp.dst_port), udp_ip->payload,
+			ntohs(udp_ip->udp.length)-sizeof(struct udp_header));
+	  } else return 1;
+	  return 0;
 	}
+	// if we got here, we couldn't process the packet
+	return 1;
 }
 
 void microudp_set_callback(udp_callback callback)
@@ -477,7 +539,8 @@ void microudp_set_callback(udp_callback callback)
 	rx_callback = callback;
 }
 
-static void process_frame(void)
+// returns 0 if frame can be processed by this function
+static int process_frame(void)
 {
   //	flush_cpu_dcache();
 #ifdef DEBUG_MICROUDP_RX
@@ -511,13 +574,27 @@ static void process_frame(void)
 	rxlen -= 4; /* strip CRC here to be consistent with TX */
 #endif
 
-	if(ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_ARP) process_arp();
-	else if(ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_IP) process_ip();
+#ifdef LIBUIP	
+	if((ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_ARP) &&
+	   (arp_mode == ARP_MICROUDP)) {
+#else
+	  if((ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_ARP)) {
+#endif
+	  process_arp();
+	  return 0;
+	}
+	else if(ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_IP) {
+	  return(process_ip());
+	}
+	return 1;
 }
 
-void microudp_start(const unsigned char *macaddr, unsigned int ip)
+void microudp_start(const unsigned char *macaddr, unsigned char ip0, unsigned char ip1,
+		    unsigned char ip2, unsigned char ip3)
 {
 	int i;
+	unsigned int ip = IPTOINT(ip0, ip1, ip2, ip3);
+	
 	ethmac_sram_reader_ev_pending_write(ETHMAC_EV_SRAM_READER);
 	ethmac_sram_writer_ev_pending_write(ETHMAC_EV_SRAM_WRITER);
 
@@ -536,17 +613,100 @@ void microudp_start(const unsigned char *macaddr, unsigned int ip)
 	rxslot = 0;
 	rxbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * rxslot);
 	rx_callback = (udp_callback)0;
+
+#ifdef LIBUIP	
+	uip_ipaddr_t ipaddr;
+	
+	rxbuffer0 = (ethernet_buffer *)(ETHMAC_BASE + 0*ETHMAC_SLOT_SIZE);
+	rxbuffer1 = (ethernet_buffer *)(ETHMAC_BASE + 1*ETHMAC_SLOT_SIZE);
+	txbuffer0 = (ethernet_buffer *)(ETHMAC_BASE + 2*ETHMAC_SLOT_SIZE);
+	txbuffer1 = (ethernet_buffer *)(ETHMAC_BASE + 3*ETHMAC_SLOT_SIZE);
+	
+	/* uip periods */
+	uip_periodic_period = SYSTEM_CLOCK_FREQUENCY/100; /*  10 ms */
+	uip_arp_period = SYSTEM_CLOCK_FREQUENCY/10;       /* 100 ms */
+
+	/* init uip */
+	process_init();
+	process_start(&etimer_process, NULL);
+	uip_init();
+
+	/* configure mac / ip */
+	for (i=0; i<6; i++) uip_lladdr.addr[i] = macaddr[i];
+	uip_ipaddr(&ipaddr, ip0, ip1, ip2, ip3);
+	uip_sethostaddr(&ipaddr);
+#endif
+	printf("Microudp init done: my IP is %d.%d.%d.%d\n", ip0, ip1, ip2, ip3);
+	
 }
 
 void microudp_service(void)
 {
+#ifdef LIBUIP
+	int i;
+	struct uip_eth_hdr *buf = (struct uip_eth_hdr *)&uip_buf[0];
+
+	etimer_request_poll();
+	process_run();
+#endif
+	/* this is the heart of liteethmac_poll() */
 	if(ethmac_sram_writer_ev_pending_read() & ETHMAC_EV_SRAM_WRITER) {
 		rxslot = ethmac_sram_writer_slot_read();
 		rxbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * rxslot);
 		rxlen = ethmac_sram_writer_length_read();
+#ifdef LIBUIP
+		memcpy(uip_buf, rxbuffer, rxlen);
+		uip_len = rxlen;
+		if( process_frame() == 0 ) {
+		  uip_len = 0; // bypass the remaining handler if microudp stack could handle it
+		}
+#else
 		process_frame();
+#endif
+		
 		ethmac_sram_writer_ev_pending_write(ETHMAC_EV_SRAM_WRITER);
+	} else {
+#ifdef LIBUIP
+	  uip_len = 0;
+#endif
 	}
+#ifdef LIBUIP
+	if(uip_len > 0) {
+#ifdef DEBUG_LIBUIP_RX
+	  printf( " <<< uip_rx %d bytes: ", uip_len );
+	  for( i = 0; i < uip_len; i++ ) {
+	    if( (i % 8) == 0 ) printf(" ");
+	    printf("%02x", ((unsigned char *)buf)[i]);
+	  }
+	  printf("\n");
+	  printf("buf->type: %d, %d\n", buf->type, uip_htons(UIP_ETHTYPE_IP) );
+#endif
+		if(buf->type == uip_htons(UIP_ETHTYPE_IP)) {
+			uip_arp_ipin();
+			uip_input();
+			if(uip_len > 0) {
+				uip_arp_out();
+				libuip_send();
+			}
+		} else if(buf->type == uip_htons(UIP_ETHTYPE_ARP)) {
+			uip_arp_arpin();
+			if(uip_len > 0)
+				libuip_send();
+		}
+	} else if (elapsed(&uip_periodic_event, uip_periodic_period)) {
+		for(i = 0; i < UIP_CONNS; i++) {
+			uip_periodic(i);
+
+			if(uip_len > 0) {
+				uip_arp_out();
+				libuip_send();
+			}
+		}
+	}
+	if (elapsed(&uip_arp_event, uip_arp_period)) {
+		uip_arp_timer();
+	}
+#endif
 }
 
 static void busy_wait(unsigned int ds)

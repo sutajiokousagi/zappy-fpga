@@ -41,8 +41,8 @@ UIPCOREOBJS=$(LIBUIPDIR)/net/ip/dhcpc.o \
 
 UIPARCHOBJS=\
 	$(UIPDIR)/clock-arch.o \
-	$(UIPDIR)/rtimer-arch.o \
-	$(UIPDIR)/liteethmac-drv.o
+	$(UIPDIR)/rtimer-arch.o
+#	$(UIPDIR)/liteethmac-drv.o
 
 UIPOBJS=$(UIPCOREOBJS) $(UIPARCHOBJS)
 OBJS_LIB+=$(UIPOBJS)
