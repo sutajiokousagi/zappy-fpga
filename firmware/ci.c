@@ -16,15 +16,22 @@
 #include "processor.h"
 #include "dump.h"
 #include "ci.h"
+#include "uptime.h"
+#include "mdio.h"
 
 static void ci_help(void)
 {
-	wputs("help                           - this command");
-	wputs("reboot                         - reboot CPU");
+	wputs("help        - this command");
+	wputs("reboot      - reboot CPU");
+#ifdef CSR_ETHPHY_MDIO_W_ADDR
+	wputs("mdio_dump   - dump mdio registers");
+	wputs("mdio_status - show mdio status");
+#endif
+	wputs("uptime      - show uptime");
 	wputs("");
-	wputs("mr                             - read address space");
-	wputs("mw                             - write address space");
-	wputs("mc                             - copy address space");
+	wputs("mr          - read address space");
+	wputs("mw          - write address space");
+	wputs("mc          - copy address space");
 	wputs("");
 }
 
@@ -102,7 +109,7 @@ static void status_service(void) {
 
 void ci_prompt(void)
 {
-	wprintf("RUNTIME>");
+  wprintf("ZAPPY %s> ", uptime_str());
 }
 
 void ci_service(void)
@@ -132,6 +139,14 @@ void ci_service(void)
 	else if(strcmp(token, "mr") == 0) mr(get_token(&str), get_token(&str));
 	else if(strcmp(token, "mw") == 0) mw(get_token(&str), get_token(&str), get_token(&str));
 	else if(strcmp(token, "mc") == 0) mc(get_token(&str), get_token(&str), get_token(&str));
+#ifdef CSR_ETHPHY_MDIO_W_ADDR
+	else if(strcmp(token, "mdio_status") == 0)
+		mdio_status();
+	else if(strcmp(token, "mdio_dump") == 0)
+		mdio_dump();
+#endif
+	else if(strcmp(token, "uptime") == 0)
+	  uptime_print();
 	else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "foo") == 0) {

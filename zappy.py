@@ -23,7 +23,6 @@ from litex.build.xilinx import XilinxPlatform, VivadoProgrammer
 from litex.soc.integration.builder import *
 
 from litex.soc.cores import spi_flash
-from litex.soc.cores import dna, xadc
 
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
@@ -36,7 +35,7 @@ from liteeth.core import LiteEthUDPIPCore
 from liteeth.core.mac import LiteEthMAC
 from liteeth.frontend.etherbone import LiteEthEtherbone
 
-from gateware.info import git
+from gateware import info
 from gateware import led
 
 _io = [
@@ -384,12 +383,11 @@ bios_size = 0x5000
 
 class ZappySoC(SoCCore):
     csr_peripherals = [
-        "dna",
-        "xadc",
+#        "xadc",
 #        "ethcore",
         "ethphy",
         "ethmac",
-        "gitinfo",
+        "info",
         "led"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
@@ -433,9 +431,7 @@ class ZappySoC(SoCCore):
         self.submodules.crg = CRG(platform)
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
 
-        self.submodules.dna = dna.DNA()
-        self.submodules.xadc = xadc.XADC()
-        self.submodules.gitinfo = git.GitInfo()
+        self.submodules.info = info.Info(platform, self.__class__.__name__)
         self.submodules.leds = led.ClassicLed(Cat(platform.request("blinkenlight", i) for i in range(2)))
 
         # spi flash

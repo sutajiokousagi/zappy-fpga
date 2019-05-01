@@ -32,7 +32,7 @@ static void print_csr_hex(unsigned int addr, size_t size) {
 	void* ptr = (void*)addr;
 	for (i = 0; i < (size * ALIGNMENT); i += ALIGNMENT) {
 		unsigned char v = MMPTR(ptr+i);
-		wprintf("%02x", v);
+		printf("%02x", v);
 	}
 }
 
@@ -40,7 +40,7 @@ void print_board_dna(void) {
 #ifdef CSR_INFO_DNA_ID_ADDR
 	print_csr_hex(CSR_INFO_DNA_ID_ADDR, CSR_INFO_DNA_ID_SIZE);
 #else
-	wprintf("Unknown");
+	printf("Unknown");
 #endif
 }
 
@@ -48,9 +48,9 @@ extern unsigned char *mac_addr;
 void print_board_mac(void) {
   unsigned char *mac = mac_addr;
   for (int i = 0; i < sizeof(mac); i++) {
-    wprintf("%02x", mac[i]);
+    printf("%02x", mac[i]);
     if (i != (sizeof(mac)-1))
-      wprintf(":");
+      printf(":");
   }
 }
 
@@ -67,9 +67,9 @@ void print_version(void) {
 	putchar('\n');
 	wprintf("gateware version info\n");
 	wprintf("===============================================\n");
-#ifdef CSR_GITINFO_COMMIT_ADDR
+#ifdef CSR_INFO_GIT_COMMIT_ADDR
 	wprintf("      revision: ");
-	print_csr_hex(CSR_GITINFO_COMMIT_ADDR, CSR_GITINFO_COMMIT_SIZE);
+	print_csr_hex(CSR_INFO_GIT_COMMIT_ADDR, CSR_INFO_GIT_COMMIT_SIZE);
 	putchar('\n');
 #endif
 //	wprintf("misoc revision: %08x\n", identifier_revision_read());

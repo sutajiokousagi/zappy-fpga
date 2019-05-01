@@ -12,21 +12,21 @@ endif
 OBJECTS=isr.o \
 		processor.o \
 		ci.o \
-		etherbone.o \
-		ethernet.o \
 		i2c.o \
 		main.o \
 		dump.o \
 		mdio.o \
 		uptime.o \
 	        version.o \
-                telnet.o \
 	        version_data.o \
-		stdio_wrap.o
+		stdio_wrap.o \
+#		etherbone.o \
+#		ethernet.o \
+#                telnet.o 
 
 CFLAGS += -I. -I../third_party/libuip -Iuip
 
-include uip/Makefile.mk
+#include uip/Makefile.mk
 
 all: firmware.bin
 
@@ -40,7 +40,7 @@ ifneq ($(OS),Windows_NT)
 endif
 	$(COPY) $@ boot.bin
 
-firmware.elf: $(OBJECTS)  uip/libuip.a
+firmware.elf: $(OBJECTS)  uip/libuip.a libnet/libnet.a
 	$(LD) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
@@ -49,14 +49,19 @@ firmware.elf: $(OBJECTS)  uip/libuip.a
 		-L$(ZAPPY_DIR)/software/libbase \
 		-L$(ZAPPY_DIR)/software/libcompiler_rt \
 		-lbase-nofloat -lcompiler_rt -Map=firmware.map \
-		-L./uip \
-		-luip
+		-L./libnet \
+		-lnet
+#		-L./uip \
+#		-luip
 
 ifneq ($(OS),Windows_NT)
 	chmod -x $@
 endif
 
-uip/libuip.a:
+libnet/libnet.a: libnet/microudp.c libnet/tftp.c
+	$(MAKE) -C libnet/
+
+uip/libuip.a: 
 	$(MAKE) -C uip/
 
 main.o: main.c
@@ -72,7 +77,7 @@ load: firmware.bin
 	litex_term --kernel firmware.bin COM8
 
 clean:
-	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~
+	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~ uip/*.o uip/*.a libnet/*.o libnet/*.a
 
 # Dependencies on generated files
 version.o: version_data.h version_data.c
