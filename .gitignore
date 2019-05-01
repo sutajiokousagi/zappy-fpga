@@ -17,4 +17,4 @@ __pycache__/
 pycharm.env
 *.upl
 *.vcd
-version_data.c
+firmware/version_data.c
