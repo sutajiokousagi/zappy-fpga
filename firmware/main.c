@@ -21,12 +21,13 @@
 #include "mdio.h"
 #include "version.h"
 
-unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
-unsigned char ip_addr[4] = {10, 0, 11, 2};
-
-
 #include <net/microudp.h>
 #include <net/tftp.h>
+
+unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
+unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
+unsigned char host_ip_addr[4] = {10, 0, 11, 3}; // host IP address
+
 /* Local TFTP client port (arbitrary) */
 #define PORT_IN		7642
 
@@ -39,8 +40,6 @@ enum {
 };
 
 #define	BLOCK_SIZE	512	/* block size in bytes */
-
-
 
 static uint8_t *packet_data;
 static int total_length;
@@ -57,7 +56,6 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 	int i;
 	int offset;
 
-	printf( "callback\n" );
 	if(length < 4) return;
 	if(dst_port != PORT_IN) return;
 	opcode = data[0] << 8 | data[1];
@@ -101,19 +99,21 @@ int main(void) {
   time_init();
   
   // Setup the Ethernet
-  //  ethernet_init(mac_addr, ip_addr);
+  //  ethernet_init(mac_addr, my_ip_addr);
   //  etherbone_init();
   //  telnet_init();
   unsigned int ip;
-  microudp_start(mac_addr, IPTOINT(ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]));
+  microudp_start(mac_addr, IPTOINT(my_ip_addr[0], my_ip_addr[1], my_ip_addr[2], my_ip_addr[3]));
   
-  ip = IPTOINT(10, 0, 11, 3); // hard coded address of our peer
-  printf("Resolving ARP for host...\n");
+  ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
+  printf("Resolving ARP for host at %d.%d.%d.%d...\n",
+	 host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
   if(!microudp_arp_resolve(ip))
     printf("ARP resolve had unexpected value\n");
   else
     printf("Host resolved!\n");
   microudp_set_callback(rx_callback);
+  printf( "TFTP service started.\n" );
   
   processor_init();
   processor_start();

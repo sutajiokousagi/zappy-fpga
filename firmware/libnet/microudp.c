@@ -89,8 +89,7 @@ struct ip_header {
 	unsigned int dst_ip;
 } __attribute__((packed));
 
-//#define ICMP_PACKET_LENGTH 98
-#define ICMP_PAYLOAD_LENGTH 56
+#define ICMP_OVERHEAD 28
 struct icmp_header {
   unsigned char type;		/* message type */
   unsigned char code;		/* type sub-code */
@@ -393,7 +392,7 @@ int microudp_send(unsigned short src_port, unsigned short dst_port, unsigned int
 	return 1;
 }
 
-int microicmp_reply(unsigned short id, unsigned short seq, char *stuff) {
+int microicmp_reply(unsigned short id, unsigned short seq, char *stuff, unsigned short length) {
   struct pseudo_header h;
   unsigned int r;
   int i;
@@ -402,8 +401,7 @@ int microicmp_reply(unsigned short id, unsigned short seq, char *stuff) {
      && (cached_mac[3] == 0) && (cached_mac[4] == 0) && (cached_mac[5] == 0))
     return 0;
   
-  txlen = sizeof(struct ethernet_header) + sizeof(struct icmp_frame) + ICMP_PAYLOAD_LENGTH;
-  //  if(txlen < ICMP_PACKET_LENGTH) txlen = ICMP_PACKET_LENGTH;
+  txlen = sizeof(struct ethernet_header) + sizeof(struct icmp_frame) + length;
 
   fill_eth_header(&txbuffer->frame.eth_header,
 		  cached_mac,
@@ -412,7 +410,7 @@ int microicmp_reply(unsigned short id, unsigned short seq, char *stuff) {
 
   txbuffer->frame.contents.icmp.ip.version = IP_IPV4;
   txbuffer->frame.contents.icmp.ip.diff_services = 0;
-  txbuffer->frame.contents.icmp.ip.total_length = htons(ICMP_PAYLOAD_LENGTH + sizeof(struct icmp_frame));
+  txbuffer->frame.contents.icmp.ip.total_length = htons(length + sizeof(struct icmp_frame));
   txbuffer->frame.contents.icmp.ip.identification = htons(0);
   txbuffer->frame.contents.icmp.ip.fragment_offset = htons(IP_DONT_FRAGMENT);
   txbuffer->frame.contents.icmp.ip.ttl = IP_TTL;
@@ -430,16 +428,12 @@ int microicmp_reply(unsigned short id, unsigned short seq, char *stuff) {
   txbuffer->frame.contents.icmp.icmp.un.echo.id = htons(id);
   txbuffer->frame.contents.icmp.icmp.un.echo.sequence = htons(seq);
 
-  //  for( i = 0; i < ICMP_PAYLOAD_LENGTH; i ++ ) { // dummy payload to avoid leaking internal info
-  //    txbuffer->frame.contents.icmp.payload[i] = 'A';
-  //  }
-  // for ping responses, don't *really* care what we send...
-  for( i = 0; i < ICMP_PAYLOAD_LENGTH; i++ ) {
+  for( i = 0; i < length; i++ ) {
     txbuffer->frame.contents.icmp.payload[i] = stuff[i];
   }
   
   r = ip_checksum(0, &txbuffer->frame.contents.icmp.icmp,
-		  sizeof(struct icmp_header)+ICMP_PAYLOAD_LENGTH, 1);
+		  sizeof(struct icmp_header)+length, 1);
   txbuffer->frame.contents.icmp.icmp.checksum = htons(r);
 
   send_packet();
@@ -461,9 +455,8 @@ static void process_ip(void)
 	if(udp_ip->ip.proto == IP_PROTO_ICMP) {
 	  struct icmp_frame *icmp_ip = &rxbuffer->frame.contents.icmp;
 	  if( (icmp_ip->icmp.type == ICMP_ECHO) || (icmp_ip->icmp.type == ICMP_TIMESTAMP) ) {
-	    printf( "total length: %d\n", ntohs(icmp_ip->ip.total_length) );
 	    microicmp_reply(ntohs(icmp_ip->icmp.un.echo.id), ntohs(icmp_ip->icmp.un.echo.sequence),
-			    icmp_ip->payload);
+			    icmp_ip->payload, ntohs(icmp_ip->ip.total_length) - ICMP_OVERHEAD);
 	  }
 	} else {
 	  if(ntohs(udp_ip->ip.total_length) < sizeof(struct udp_frame)) return;

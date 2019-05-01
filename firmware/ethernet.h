@@ -17,4 +17,7 @@ void uip_log(char *msg);
 void ethernet_init(const unsigned char * mac_addr, const unsigned char *ip_addr);
 void ethernet_service(void);
 
+extern unsigned char mac_addr[];
+extern unsigned char my_ip_addr[];
+extern unsigned char host_ip_addr[];
 #endif

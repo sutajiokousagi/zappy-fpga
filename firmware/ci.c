@@ -18,6 +18,9 @@
 #include "ci.h"
 #include "uptime.h"
 #include "mdio.h"
+#include <net/microudp.h>
+#include <net/tftp.h>
+#include "ethernet.h"
 
 static void ci_help(void)
 {
@@ -28,6 +31,7 @@ static void ci_help(void)
 	wputs("mdio_status - show mdio status");
 #endif
 	wputs("uptime      - show uptime");
+	wputs("upload      - do upload test");
 	wputs("");
 	wputs("mr          - read address space");
 	wputs("mw          - write address space");
@@ -112,6 +116,10 @@ void ci_prompt(void)
   wprintf("ZAPPY %s> ", uptime_str());
 }
 
+#define DEFAULT_TFTP_SERVER_PORT 69  /* IANA well known port: UDP/69 */
+#ifndef TFTP_SERVER_PORT
+#define TFTP_SERVER_PORT DEFAULT_TFTP_SERVER_PORT
+#endif
 void ci_service(void)
 {
 	char *str;
@@ -147,7 +155,11 @@ void ci_service(void)
 #endif
 	else if(strcmp(token, "uptime") == 0)
 	  uptime_print();
-	else if(strcmp(token, "debug") == 0) {
+	else if(strcmp(token, "upload") == 0) {
+	  unsigned int ip;
+	  ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
+	  tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)0x40000000, 32*1024);
+	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "foo") == 0) {
 	    wputs( "foo!" );
