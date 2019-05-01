@@ -11,8 +11,8 @@
 
 #include <net/microudp.h>
 
-#define DEBUG_MICROUDP_TX
-#define DEBUG_MICROUDP_RX
+//#define DEBUG_MICROUDP_TX
+//#define DEBUG_MICROUDP_RX
 
 #define ETHERTYPE_ARP 0x0806
 #define ETHERTYPE_IP  0x0800
@@ -459,10 +459,8 @@ static void process_ip(void)
 	//if(rxbuffer->frame.contents.udp.ip.diff_services != 0) return;
 
 	if(udp_ip->ip.proto == IP_PROTO_ICMP) {
-	  puts("ICMP\n");
 	  struct icmp_frame *icmp_ip = &rxbuffer->frame.contents.icmp;
 	  if( (icmp_ip->icmp.type == ICMP_ECHO) || (icmp_ip->icmp.type == ICMP_TIMESTAMP) ) {
-	    printf("echo request seq: %d\n", icmp_ip->icmp.un.echo.sequence);
 	    microicmp_reply(ntohs(icmp_ip->icmp.un.echo.id), ntohs(icmp_ip->icmp.un.echo.sequence),
 			    icmp_ip->payload);
 	  }
