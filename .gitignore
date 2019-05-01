@@ -6,6 +6,7 @@
 *.swp
 *.swo
 *.map
+*.a
 build
 .env
 .vscode
