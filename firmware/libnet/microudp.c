@@ -461,6 +461,7 @@ static void process_ip(void)
 	if(udp_ip->ip.proto == IP_PROTO_ICMP) {
 	  struct icmp_frame *icmp_ip = &rxbuffer->frame.contents.icmp;
 	  if( (icmp_ip->icmp.type == ICMP_ECHO) || (icmp_ip->icmp.type == ICMP_TIMESTAMP) ) {
+	    printf( "total length: %d\n", ntohs(icmp_ip->ip.total_length) );
 	    microicmp_reply(ntohs(icmp_ip->icmp.un.echo.id), ntohs(icmp_ip->icmp.un.echo.sequence),
 			    icmp_ip->payload);
 	  }
