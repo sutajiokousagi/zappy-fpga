@@ -306,9 +306,11 @@ class CRG(Module, AutoCSR):
 
         clk50 = platform.request("clk50")
         rst = Signal()
-        self.clock_domains.cd_sys = ClockDomain()
 
+        self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.cd_eth = ClockDomain()
+        self.clock_domains.cd_analog = ClockDomain()
+        self.clock_domains.cd_adc = ClockDomain()
 
         # DRP
         self._mmcm_read = CSR()
@@ -323,6 +325,8 @@ class CRG(Module, AutoCSR):
         pll_sys = Signal()
         pll_clk50 = Signal()
         clk50_distbuf = Signal()
+        pll_analog = Signal()
+        pll_adc = Signal()
 
         self.specials += [
             Instance("BUFR", i_I=clk50, o_O=clk50_distbuf),
@@ -331,12 +335,13 @@ class CRG(Module, AutoCSR):
 
         pll_fb_bufg = Signal()
         mmcm_drdy = Signal()
+        pll_clkout6= Signal()
         self.specials += [
             Instance("MMCME2_ADV",
                      p_STARTUP_WAIT="FALSE", o_LOCKED=pll_locked,
                      p_BANDWIDTH="OPTIMIZED",
 
-                     # VCO @ 800 MHz or 600 MHz
+                     # VCO @ 800 MHz
                      p_REF_JITTER1=0.01, p_CLKIN1_PERIOD=(1 / refclk_freq) * 1e9,
                      p_CLKFBOUT_MULT_F=16, p_DIVCLK_DIVIDE=1,
                      i_CLKIN1=clk50_distbuf, i_CLKFBIN=pll_fb_bufg, o_CLKFBOUT=pll_fb,
@@ -346,8 +351,21 @@ class CRG(Module, AutoCSR):
                      o_CLKOUT0=pll_sys,
 
                      # 50 MHz - clk50 distribution buffer
+                     p_CLKOUT1_DIVIDE=16, p_CLKOUT1_PHASE=0.0,
+                     o_CLKOUT1=pll_clk50,
+
+                     # 20 MHz - ADC clock
+                     p_CLKOUT2_DIVIDE=40, p_CLKOUT2_PHASE=0.0,
+                     o_CLKOUT2=pll_adc,
+
+                     # Cascade to generate a slow clock for timing the ADC sampler subsystem
+                     p_CLKOUT4_CASCADE="TRUE",
+                     # 1 MHz @ CLKOUT4
                      p_CLKOUT4_DIVIDE=16, p_CLKOUT4_PHASE=0.0,
-                     o_CLKOUT4=pll_clk50,
+                     o_CLKOUT4=pll_analog,
+                     # 16 MHz @ CLKOUT6 -> cascade to input of CLKOUT4 divider
+                     p_CLKOUT6_DIVIDE=50, p_CLKOUT6_PHASE=0.0,
+                     o_CLKOUT6=pll_clkout6,
 
                      # DRP
                      i_DCLK=ClockSignal(),
@@ -365,9 +383,13 @@ class CRG(Module, AutoCSR):
             # global distribution buffers
             Instance("BUFG", i_I=pll_sys, o_O=self.cd_sys.clk),
             Instance("BUFG", i_I=pll_clk50, o_O=self.cd_eth.clk),
+            Instance("BUFG", i_I=pll_adc, o_O=self.cd_adc.clk),
+            Instance("BUFG", i_I=pll_analog, o_O=self.cd_analog.clk),
 
             AsyncResetSynchronizer(self.cd_sys, rst | ~pll_locked),
             AsyncResetSynchronizer(self.cd_eth, ~pll_locked | rst),
+            AsyncResetSynchronizer(self.cd_analog, rst | ~pll_locked),
+            AsyncResetSynchronizer(self.cd_adc, rst | ~pll_locked),
         ]
         self.sync += [
             If(self._mmcm_read.re | self._mmcm_write.re,
