@@ -171,6 +171,15 @@ void ci_service(void)
 	  if( i < 0 ) i += timer0_reload_read();
 	  printf("Elapsed ticks for 1MiB: %d, or %dms per megabyte\n",
 		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
+	} else if(strcmp(token, "seed") == 0) {
+	  unsigned int seed = strtoul(get_token(&str), NULL, 0);
+	  printf("Setting memory with seed value %08x\n", seed);
+	  memtest_seed_write(seed);
+	  memtest_count_write(32768 - 1);
+	  memtest_update_write(1);
+	  while( memtest_done_read() == 0 )
+	    ;
+
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "foo") == 0) {

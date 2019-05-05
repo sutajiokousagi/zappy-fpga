@@ -37,6 +37,7 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 
 from gateware import info
 from gateware import led
+from gateware.adc121s101 import Zappy_memtest
 
 _io = [
     # ADCs
@@ -410,7 +411,9 @@ class ZappySoC(SoCCore):
         "ethphy",
         "ethmac",
         "info",
-        "led"
+        "led",
+        "memtest",
+#        "memtest_mem"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 #    csr_map = {
@@ -432,7 +435,8 @@ class ZappySoC(SoCCore):
 
     mem_map = {
         "spiflash": 0x20000000,  # (default shadow @0xa0000000)
-        "ethmac": 0x30000000,  # (shadow @0xb0000000)
+        "ethmac":   0x30000000,  # (shadow @0xb0000000)
+        "memtest":  0x50000000,
     }
     mem_map.update(SoCCore.mem_map)
 
@@ -518,6 +522,10 @@ class ZappySoC(SoCCore):
         self.fan_pwm = Signal()
         self.comb += platform.request("fan_pwm", 0).eq(1) # lock the fan to the "on" position
 
+        memdepth = 32768
+        self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
+        self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
+        self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
 """
         # SPI for flash already added above
         # SPI for ADC
