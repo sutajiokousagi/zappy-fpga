@@ -18,3 +18,4 @@ pycharm.env
 *.upl
 *.vcd
 firmware/version_data.c
+sim/run/
