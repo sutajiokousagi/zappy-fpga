@@ -100,6 +100,7 @@ class Dac8560(Module):
 #   CSR update (wo) - writing anything to this bit triggers an update
 #   CSR data (wo, 16) - data to send
 #   CSR ready (ro) - If module is ready to accept data, 1. Otherwise sender should wait or else update will be ignored.
+#   "dac" `Clock` (implicit) - CLOCK tie clock to the "dac" domain - maximum 20MHz @ 3.3V
 #
 #   Code loop should: 1) update data, 2) wait until ready is set, 3) trigger update
 #   Note that if DAC clock is  max 20MHz by the spec sheet. Code assumes sysclk is around 100-150 MHz.
