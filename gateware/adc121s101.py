@@ -100,7 +100,7 @@ class Adc121s101_csr(Module, AutoCSR):
         self.valid = CSRStatus(1)
 
         adc_valid_sync = Signal()
-        self.submodules += MultiReg(self.adc.valid, adc_valid_sync) # bring valid into the sysclk domain, adds some latency
+        self.specials += MultiReg(self.adc.valid, adc_valid_sync) # bring valid into the sysclk domain, adds some latency
 
         count = Signal(5)
         fsm = FSM(reset_state="IDLE")
