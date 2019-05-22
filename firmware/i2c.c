@@ -1,108 +1,111 @@
-#include "asm.h"
+#include <time.h>
+#include <generated/csr.h>
+#include <generated/mem.h>
+#include <hw/flags.h>
+#include <console.h>
+#include <system.h>
+#include <stdio.h>
+
 #include "i2c.h"
 
-/* I2C bit banging */
-int i2c_init(I2C *i2c)
-{
-	unsigned int timeout;
+static int i2c_tip_wait(int timeout);
 
-	i2c->started = 0;
-	i2c->w_write(I2C_SCL);
-	/* Check the I2C bus is ready */
-	timeout = 1000;
-	while((timeout > 0) && (!(i2c->r_read() & I2C_SDAIN))) timeout--;
+int i2c_init(void) {
+  // set prescaler
+  i2c_prescale_write(199);  // 100MHz / (5* 100kHz) - 1 = 199
 
-	return timeout;
+  i2c_control_write(I2C_CTL_MASK_EN); // enable the I2C unit
+
+  return 0;
 }
 
-void i2c_delay(void)
-{
-	unsigned int i;
+static int i2c_tip_wait(int timeout) {
+  int init_time;
+  int timer;
 
-	for(i=0;i<1000;i++) NOP;
+  elapsed(&init_time, -1); // initialize timer
+  timer = init_time;
+  
+  // wait for TIP to go high
+  while( !(i2c_status_read() & I2C_STAT_MASK_TIP) ) {
+    if( elapsed(&timer, timeout) ) {
+      printf("TIP did not go high\n");
+      i2c_command_write(0);
+      return 1;
+    }
+    timer = init_time;
+  }
+
+  elapsed(&init_time, -1); // initialize timer
+  timer = init_time;
+  // wait for TIP to go low
+  while( i2c_status_read() & I2C_STAT_MASK_TIP ) {
+    if( elapsed(&timer, timeout) ) {
+      printf("TIP did not go low\n");
+      i2c_command_write(0);
+      return 1;
+    }
+    timer = init_time;
+  }
+
+  i2c_command_write(0);
+  return 0;
 }
 
-/* I2C bit-banging functions from http://en.wikipedia.org/wiki/I2c */
-unsigned int i2c_read_bit(I2C *i2c)
-{
-	unsigned int bit;
+// returns 0 if good
+// timeout is in SYSCLK cycles
+int i2c_master(unsigned char addr, uint8_t *txbuf, int txbytes, uint8_t *rxbuf, int rxbytes, unsigned int timeout) {
+  int i;
+  int ret = 0;
 
-	/* Let the slave drive data */
-	i2c->w_write(0);
-	i2c_delay();
-	i2c->w_write(I2C_SCL);
-	i2c_delay();
-	bit = i2c->r_read() & I2C_SDAIN;
-	i2c_delay();
-	i2c->w_write(0);
-	return bit;
-}
+  /// write half
+  if( (txbytes > 0) && (txbuf != NULL) ) {
+    i2c_txr_write( addr << 1 | 0 ); // LSB 0 = writing
+    i2c_command_write( I2C_CMD_MASK_STA | I2C_CMD_MASK_WR );
 
-void i2c_write_bit(I2C *i2c, unsigned int bit)
-{
-	if(bit) {
-		i2c->w_write(I2C_SDAOE | I2C_SDAOUT);
-	} else {
-		i2c->w_write(I2C_SDAOE);
-	}
-	i2c_delay();
-	/* Clock stretching */
-	i2c->w_write(i2c->w_read() | I2C_SCL);
-	i2c_delay();
-	i2c->w_write(i2c->w_read() & ~I2C_SCL);
-}
+    ret += i2c_tip_wait(timeout);
 
-void i2c_start_cond(I2C *i2c)
-{
-	if(i2c->started) {
-		/* set SDA to 1 */
-		i2c->w_write(I2C_SDAOE | I2C_SDAOUT);
-		i2c_delay();
-		i2c->w_write(i2c->w_read() | I2C_SCL);
-		i2c_delay();
-	}
-	/* SCL is high, set SDA from 1 to 0 */
-	i2c->w_write(I2C_SDAOE|I2C_SCL);
-	i2c_delay();
-	i2c->w_write(I2C_SDAOE);
-	i2c->started = 1;
-}
+    i = 0;
+    while( i < txbytes ) {
+      if( i2c_status_read() & I2C_STAT_MASK_RXACK ) {
+	printf( "Tx fail on byte %d\n", i );
+	ret = 1;
+      }
+      i2c_txr_write( txbuf[i] );
+      if( (i == (txbytes - 1)) && (rxbytes == 0 || rxbuf == NULL) )
+	i2c_command_write( I2C_CMD_MASK_WR | I2C_CMD_MASK_STO );
+      else
+	i2c_command_write( I2C_CMD_MASK_WR );
+      ret += i2c_tip_wait(timeout);
+      i++;
+    }
+    
+    if( i2c_status_read() & I2C_STAT_MASK_RXACK ) {
+      printf( "Tx fail on byte %d\n", i );
+      ret = 1;
+    }
+  }
 
-void i2c_stop_cond(I2C *i2c)
-{
-	/* set SDA to 0 */
-	i2c->w_write(I2C_SDAOE);
-	i2c_delay();
-	/* Clock stretching */
-	i2c->w_write(I2C_SDAOE | I2C_SCL);
-	/* SCL is high, set SDA from 0 to 1 */
-	i2c->w_write(I2C_SCL);
-	i2c_delay();
-	i2c->started = 0;
-}
+  /// read half
+  if( rxbytes == 0 || rxbuf == NULL )
+    return ret;
+  
+  i2c_txr_write( addr << 1 | 1 ); // LSB 1 = reading
+  i2c_command_write( I2C_CMD_MASK_STA | I2C_CMD_MASK_WR );
+  ret += i2c_tip_wait(timeout);
 
-unsigned int i2c_write(I2C *i2c, unsigned char byte)
-{
-	unsigned int bit;
-	unsigned int ack;
+  i = 0;
+  while( i < rxbytes ) {
+    if( i == (rxbytes - 1) )
+      i2c_command_write( I2C_CMD_MASK_RD | I2C_CMD_MASK_ACK | I2C_CMD_MASK_STO );
+    else
+      i2c_command_write( I2C_CMD_MASK_RD );
+    
+    ret += i2c_tip_wait(timeout);
+    
+    rxbuf[i] = i2c_rxr_read();
+    i++;
+  }
 
-	for(bit = 0; bit < 8; bit++) {
-		i2c_write_bit(i2c, byte & 0x80);
-		byte <<= 1;
-	}
-	ack = !i2c_read_bit(i2c);
-	return ack;
-}
-
-unsigned char i2c_read(I2C *i2c, int ack)
-{
-	unsigned char byte = 0;
-	unsigned int bit;
-
-	for(bit = 0; bit < 8; bit++) {
-		byte <<= 1;
-		byte |= i2c_read_bit(i2c);
-	}
-	i2c_write_bit(i2c, !ack);
-	return byte;
+  return ret;
 }
