@@ -37,7 +37,10 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 
 from gateware import info
 from gateware import led
-from gateware.adc121s101 import Zappy_memtest
+from gateware.adc121s101 import Zappy_memtest, Adc121s101_csr
+from gateware.dac8560 import Dac8560_csr
+from gateware.pwm import PWM
+from gateware.zappy_i2c import ZappyI2C
 
 _io = [
     # ADCs
@@ -82,15 +85,14 @@ _io = [
 
     # driver GPIOs
     ("driver", 0,
-        Subsignal("col", Pins("K11" "B2" "E4" "B1" "C5" "D3" "A4" "D2" "B5" "E2" "B6" "J11"), IOStandard("LVCMOS33")),
-        Subsignal("row", Pins("A3" "K12" "A2" "L13"), IOStandard("LVCMOS33")),
+        Subsignal("col", Pins("K11", "B2", "E4", "B1", "C5", "D3", "A4", "D2", "B5", "E2", "B6", "J11"), IOStandard("LVCMOS33")),
+        Subsignal("row", Pins("A3", "K12", "A2", "L13"), IOStandard("LVCMOS33")),
     ),
     ("drv_cap", 0, Pins("L12"), IOStandard("LVCMOS33")),
     ("drv_rdis", 0, Pins("A5"), IOStandard("LVCMOS33")),
 
     # other GPIOs
-    ("blinkenlight", 0, Pins("M13"), IOStandard("LVCMOS33")),
-    ("blinkenlight", 1, Pins("N14"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 0, Pins("M13", "N14"), IOStandard("LVCMOS33")),
     ("blinkenlight", 2, Pins("J1"), IOStandard("LVCMOS33")),
 
     ("noplate", 0, Pins("H12"), IOStandard("LVCMOS33")),
@@ -406,30 +408,24 @@ bios_size = 0x5000
 
 class ZappySoC(SoCCore):
     csr_peripherals = [
-#        "xadc",
-#        "ethcore",
         "ethphy",
         "ethmac",
         "info",
         "led",
         "memtest",
 #        "memtest_mem"
+        "buzzpwm",
+        "hvengage",
+        "hvdac",
+        "vmon",
+        "imon",
+        "i2c",
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
-#    csr_map = {
-#        "dna": 8,
-#        "xadc": 9,
-#        "cpu_or_bridge": 10,
-#        "ethcore": 11,
-#        "ethphy": 12,
-#        "ethmac": 13,
-#        "gitinfo": 14,
-#        "led" : 15,
-#    }
-#    csr_map.update(SoCCore.csr_map)
 
     interrupt_map = {
         "ethmac": 3,
+        "i2c" : 4,
     }
     interrupt_map.update(SoCCore.interrupt_map)
 
@@ -458,7 +454,7 @@ class ZappySoC(SoCCore):
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
 
         self.submodules.info = info.Info(platform, self.__class__.__name__)
-        self.submodules.leds = led.ClassicLed(Cat(platform.request("blinkenlight", i) for i in range(2)))
+        self.submodules.led = led.ClassicLed(platform.request("blinkenlight", 0))
 
         # spi flash
         spiflash_pads = platform.request(spiflash)
@@ -478,7 +474,7 @@ class ZappySoC(SoCCore):
         self.add_constant("SPIFLASH_SECTOR_SIZE", 0x10000)
         self.add_wb_slave(mem_decoder(self.mem_map["spiflash"]), self.spiflash.bus)
         self.add_memory_region(
-            "spiflash", self.mem_map["spiflash"] | self.shadow_base, 8*1024*1024)
+            "spiflash", self.mem_map["spiflash"] | self.shadow_base, 512*1024*1024)
 
         self.flash_boot_address = 0x207b0000
 
@@ -489,23 +485,11 @@ class ZappySoC(SoCCore):
         ethphy = LiteEthPHYRMII(platform.request("rmii_eth_clocks"),
                              platform.request("rmii_eth"))
         self.submodules.ethphy = ethphy = ClockDomainsRenamer("eth")(ethphy)
-#        mac_address = 0x1337320dbabe
-#        ip_address = "10.0.11.2"
-#        ethcore = LiteEthUDPIPCore(ethphy, mac_address, convert_ip(ip_address), int(50e6), with_icmp=True)
-#        self.submodules.ethcore = ethcore = ClockDomainsRenamer("eth")(ethcore)
         self.submodules.ethmac = LiteEthMAC(phy=self.ethphy, dw=32,
             interface="wishbone", endianness=self.cpu.endianness)
         self.add_wb_slave(mem_decoder(self.mem_map["ethmac"]), self.ethmac.bus)
         self.add_memory_region("ethmac", self.mem_map["ethmac"] | self.shadow_base, 0x2000)
 
-#        etherbone_cd = ClockDomain("etherbone")
-#        self.clock_domains += etherbone_cd
-#        self.comb += [
-#            etherbone_cd.clk.eq(ClockSignal("sys")),
-#            etherbone_cd.rst.eq(ResetSignal("sys"))
-#        ]
-#        self.submodules.etherbone = LiteEthEtherbone(ethcore.udp, 1234, mode="master", cd="etherbone")
-#        self.add_wb_master(self.etherbone.wishbone.bus)
 
         self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
@@ -519,13 +503,31 @@ class ZappySoC(SoCCore):
         self.sync += sys_counter.eq(sys_counter + 1)
         self.comb += self.sys_led.eq(sys_counter[26])
 
-        self.fan_pwm = Signal()
-        self.comb += platform.request("fan_pwm", 0).eq(1) # lock the fan to the "on" position
+        # turn on the fan
+        fan_pwm = Signal()
+        self.comb += platform.request("fan_pwm", 0).eq(1)
+
+        # add the buzzer, fixed at resonant frequency for loudest alert
+        self.submodules.buzzpwm = PWM(platform.request("buzzer_drv", 0))
+
+        # add I2C interface
+        self.submodules.i2c = ZappyI2C(platform, platform.request("i2c", 0))
+
+
+
+
+        # these are primarily for testing at the moment
+        self.submodules.hvdac = ClockDomainsRenamer({"dac":"adc"})( Dac8560_csr(platform.request("hvdac", 0)) )
+        self.submodules.vmon = Adc121s101_csr(platform.request("vmon", 0))
+        self.submodules.imon = Adc121s101_csr(platform.request("imon", 0))
+        self.submodules.hvengage = led.ClassicLed(platform.request("hv_engage", 0))
 
         memdepth = 32768
         self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
         self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
         self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
+
+
 """
         # SPI for flash already added above
         # SPI for ADC
