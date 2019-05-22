@@ -21,6 +21,7 @@
 #include <net/microudp.h>
 #include <net/tftp.h>
 #include "ethernet.h"
+#include "i2c.h"
 
 static void ci_help(void)
 {
@@ -180,13 +181,69 @@ void ci_service(void)
 	  while( memtest_done_read() == 0 )
 	    ;
 
+	} else if(strcmp(token, "i2c") == 0) {
+	  token = get_token(&str);
+	  if(strcmp(token, "test") == 0) {
+	    uint8_t tx[3];
+	    uint8_t rx[2];
+	    int ret;
+
+	    tx[0] = 0x1; // pointer
+	    tx[1] = 0x60; // set 12 bits
+	    tx[2] = 0x0;
+	    ret = i2c_master(0x4C, tx, 3, NULL, 0, 50000000);
+	    if( ret ) {
+	      printf( "I2C call returned %d errors\n", ret );
+	    }
+	    
+	    tx[0] = 0x0; // pointer
+	    ret = i2c_master(0x4C, tx, 1, NULL, 0, 50000000);
+	    if( ret ) {
+	      printf( "I2C call returned %d errors\n", ret );
+	    }
+
+	    rx[0] = 0; rx[1] = 0;
+	    ret = i2c_master(0x4C, tx, 0, rx, 2, 50000000);
+	    if( ret ) {
+	      printf( "I2C call returned %d errors\n", ret );
+	    }
+	    printf( "Temperature registers: 0x%02x 0x%02x\n", rx[0], rx[1] );
+	    int16_t inttemp = ((int16_t) rx[0] << 8) | (int16_t)rx[1];
+	    inttemp = inttemp >> 4;
+	    int32_t longtemp = (int32_t) inttemp;
+	    longtemp = longtemp * 625;
+	    uint32_t remainder;
+	    if( longtemp > 0 )
+	      remainder = longtemp % 10000;
+	    else
+	      remainder = -longtemp % 10000;
+	    printf( "Tempertaure: %d.%dC\n", longtemp / 10000, remainder / 1000 );
+	  } else {
+	    printf( "i2c subcommand not recognized\n" );
+	  }
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
-	  if(strcmp(token, "foo") == 0) {
-	    wputs( "foo!" );
-	  }
-	  else if(strcmp(token, "bar") == 0) {
-	    wprintf("bar!\r\n");
+	  if(strcmp(token, "led") == 0) {
+	    led_out_write( (unsigned char) strtoul(get_token(&str), NULL, 0) );
+	  } else if(strcmp(token, "buzz") == 0) {
+	    buzzpwm_enable_write( (unsigned char) strtoul(get_token(&str), NULL, 0) );
+	  } else if(strcmp(token, "hvdac") == 0) {
+	    hvdac_data_write((unsigned short int) strtoul(get_token(&str), NULL, 0));
+	    while( !hvdac_ready_read() )
+	      ;
+	    hvdac_update_write(1);
+	  } else if(strcmp(token, "hvengage") == 0) {
+	    hvengage_out_write( (unsigned char) strtoul(get_token(&str), NULL, 0) );
+	  } else if(strcmp(token, "vmon") == 0) {
+	    vmon_acquire_write(1);
+	    while( !vmon_valid_read() )
+	      ;
+	    printf( "vmon: %d\n", vmon_data_read() );
+	  } else if(strcmp(token, "imon") == 0) {
+	    imon_acquire_write(1);
+	    while( !imon_valid_read() )
+	      ;
+	    printf( "imon: %d\n", imon_data_read() );
 	  } else {
 	    help_debug();
 	  }

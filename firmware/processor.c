@@ -12,7 +12,7 @@
 #include "processor.h"
 
 void processor_init(void) {
-  
+  i2c_init();
 }
 
 void processor_start(void) {

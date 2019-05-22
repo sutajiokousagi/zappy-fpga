@@ -133,7 +133,15 @@ int main(void) {
   processor_start();
 
   ci_prompt();
-  
+
+  // turn off LEDs
+  led_out_write(0);
+
+  // initialize buzzer PWM frequency and make sure it's off
+  buzzpwm_enable_write(0);
+  buzzpwm_period_write(SYSTEM_CLOCK_FREQUENCY / 3100);
+  buzzpwm_width_write( (SYSTEM_CLOCK_FREQUENCY / 3100) / 2 );
+
   while(1) {
     uptime_service();
     processor_service();
