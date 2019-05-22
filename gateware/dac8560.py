@@ -112,6 +112,8 @@ class Dac8560_csr(Module, AutoCSR):
         self.ready = CSRStatus(1)
 
         self.specials += MultiReg(self.dac.ready, self.ready.status)
+        # no synchronizer for the data because we assume it doesn't move while "update" is being written
+        self.comb += self.dac.data.eq(self.data.storage)
 
         # extend CSR update single-cycle pulse to several cycles so DAC is sure to see it (running in a slower domain)
         trigger = Signal()
