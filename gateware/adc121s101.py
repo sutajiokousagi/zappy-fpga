@@ -83,6 +83,11 @@ class Adc121s101(Module):
                      i_S=0,
             ),
         ]
+        # generate debug clock, it's at half rate but at least whe know where the edges are
+        self.dbg_sclk = Signal()
+        self.sync.adc += [
+            self.dbg_sclk.eq(~self.dbg_sclk)
+        ]
 
 # CSR wrapper for the Adc121s101 module
 #   pads PadGroup - see Adc121s101 for spec
@@ -125,9 +130,14 @@ class Adc121s101_csr(Module, AutoCSR):
         fsm.act("WAIT",
                 If(adc_valid_sync,
                    NextValue(self.data.status, self.adc.data),
-                   NextValue(self.adc.ready, 0),
                    NextValue(self.valid.status, 1),
-                   NextState("IDLE")
+                   NextState("ACK")
+                )
+        )
+        fsm.act("ACK",
+                If(~adc_valid_sync,
+                   NextValue(self.adc.ready, 0),
+                   NextState("IDLE"),
                 )
         )
 
