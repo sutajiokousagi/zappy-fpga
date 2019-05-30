@@ -92,8 +92,8 @@ _io = [
     ("drv_rdis", 0, Pins("A5"), IOStandard("LVCMOS33")),
 
     # other GPIOs
-    ("blinkenlight", 0, Pins("M13", "N14"), IOStandard("LVCMOS33")),
-    ("blinkenlight", 2, Pins("J1"), IOStandard("LVCMOS33")),
+    ("blinkenlight", 0, Pins("M13", "N14"), IOStandard("LVCMOS33"), Misc("DRIVE=12")), # higher drive because of LEDs
+    ("blinkenlight", 2, Pins("J1"), IOStandard("LVCMOS33"), Misc("DRIVE=12")),
 
     ("noplate", 0, Pins("H12"), IOStandard("LVCMOS33")),
     ("noplate", 1, Pins("L14"), IOStandard("LVCMOS33")),
@@ -102,7 +102,7 @@ _io = [
 
     ("fan_pwm", 0, Pins("E12"), IOStandard("LVCMOS33")),
     ("fan_tach", 0, Pins("D13"), IOStandard("LVCMOS33")),
-    ("hv_engage", 0, Pins("F3"), IOStandard("LVCMOS33")),
+    ("hv_engage", 0, Pins("F3"), IOStandard("LVCMOS33"), Misc("DRIVE=12")),
     ("l25_open_dark_lv", 0, Pins("M12"), IOStandard("LVCMOS33")),
     ("l25_pos_dark_lv", 0, Pins("M11"), IOStandard("LVCMOS33")),
     ("mcu_int0", 0, Pins("D1"), IOStandard("LVCMOS33")),
@@ -420,6 +420,7 @@ class ZappySoC(SoCCore):
         "vmon",
         "imon",
         "i2c",
+        "analyzer",
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -527,6 +528,20 @@ class ZappySoC(SoCCore):
         self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
         self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
 
+        from litescope import LiteScopeAnalyzer
+
+        analyzer_signals = [
+            self.vmon.adc.dout,
+            self.vmon.adc.cs_n,
+            self.vmon.adc.dbg_sclk,
+            self.vmon.acquire.storage,
+            self.vmon.data.status,
+            self.vmon.valid.status,
+        ]
+        # WHEN NOT USING ANALYZER, COMMENT OUT FOR FASTER COMPILE TIMES
+        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, clock_domain="sys", trigger_depth=8)
+    def do_exit(self, vns):
+        self.analyzer.export_csv(vns, "test/analyzer.csv")
 
 """
         # SPI for flash already added above
