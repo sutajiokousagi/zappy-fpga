@@ -48,7 +48,7 @@ static int i2c_tip_wait(int timeout) {
     timer = init_time;
   }
 
-  i2c_command_write(0);
+  i2c_command_write(0); // reset i2c command to known state now that cycle is done
   return 0;
 }
 

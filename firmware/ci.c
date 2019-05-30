@@ -22,6 +22,21 @@
 #include <net/tftp.h>
 #include "ethernet.h"
 #include "i2c.h"
+#include "si1153.h"
+
+static i2cSensorConfig_t sensI2C;			//Holds i2c information about the connected sensor
+static Si115xSample_t samples;				//Stores the sample data from reading the sensor
+static uint8_t initialized = SI11XX_NONE;	//Tracks which sensor demo is initialized
+
+void getSensorData(void)
+{
+	// Start next measurement
+	Si115xForce(&sensI2C);
+
+	// Sensor data ready
+	// Process measurement
+	Si115xHandler(&sensI2C, &samples);
+}
 
 static void ci_help(void)
 {
@@ -246,6 +261,26 @@ void ci_service(void)
 	    printf( "imon: %d\n", imon_data_read() );
 	  } else {
 	    help_debug();
+	  }
+	} else if(strcmp(token, "oprox") == 0 ) {
+	  token = get_token(&str);
+	  if(strcmp(token, "init") == 0) {
+	    sensI2C.i2cAddress = SI1153_I2C_ADDR;
+	    
+	    Si115xInitProxAls(&sensI2C, false);
+	    getSensorData(); // populate initial recrods
+	  } else if(strcmp(token, "prox") == 0) {
+	    int i;
+	    Si115xInitProxAls(&sensI2C, true);
+	    for( i = 0; i < 50; i++ ) {
+	      getSensorData(); 
+	      int32_t result = (int32_t) samples.ch0;
+	      if(result < 0){
+		result = 0;
+	      }
+	      printf("Prox %d counts\n\r", result);
+	      delay_ms(50);
+	    }
 	  }
 	} else {
 	  if( strlen(token) > 0 )

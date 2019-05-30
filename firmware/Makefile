@@ -29,6 +29,7 @@ OBJECTS=isr.o \
 	        version.o \
 	        version_data.o \
 		stdio_wrap.o \
+		si1153.o \
 
 ifeq (yes,$(USE_UIP))
 	CFLAGS += -DLIBUIP
