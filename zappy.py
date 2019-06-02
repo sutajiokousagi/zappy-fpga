@@ -407,29 +407,6 @@ boot_offset = 0x1000000
 bios_size = 0x5000
 
 class ZappySoC(SoCCore):
-    csr_peripherals = [
-        "ethphy",
-        "ethmac",
-        "info",
-        "led",
-        "memtest",
-#        "memtest_mem"
-        "buzzpwm",
-        "hvengage",
-        "hvdac",
-        "vmon",
-        "imon",
-        "i2c",
-        "analyzer",
-    ]
-    csr_map_update(SoCCore.csr_map, csr_peripherals)
-
-    interrupt_map = {
-        "ethmac": 3,
-        "i2c" : 4,
-    }
-    interrupt_map.update(SoCCore.interrupt_map)
-
     mem_map = {
         "spiflash": 0x20000000,  # (default shadow @0xa0000000)
         "ethmac":   0x30000000,  # (shadow @0xb0000000)
@@ -447,15 +424,17 @@ class ZappySoC(SoCCore):
                          integrated_sram_size=0x4000,  # stack gets put here at runtime (16k stack)
                          integrated_main_ram_size=0x20000,  # code gets loaded here at runtime
                          ident="Zappy LiteX Base SoC",
-                         reserve_nmi_interrupt=False,
                          cpu_type="vexriscv",
                          **kwargs)
 
         self.submodules.crg = CRG(platform)
+        self.add_csr("crg")
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
 
         self.submodules.info = info.Info(platform, self.__class__.__name__)
+        self.add_csr("info")
         self.submodules.led = led.ClassicLed(platform.request("blinkenlight", 0))
+        self.add_csr("led")
 
         # spi flash
         spiflash_pads = platform.request(spiflash)
@@ -486,8 +465,11 @@ class ZappySoC(SoCCore):
         ethphy = LiteEthPHYRMII(platform.request("rmii_eth_clocks"),
                              platform.request("rmii_eth"))
         self.submodules.ethphy = ethphy = ClockDomainsRenamer("eth")(ethphy)
+        self.add_csr("ethphy")
         self.submodules.ethmac = LiteEthMAC(phy=self.ethphy, dw=32,
             interface="wishbone", endianness=self.cpu.endianness)
+        self.add_csr("ethmac")
+        self.add_interrupt("ethmac")
         self.add_wb_slave(mem_decoder(self.mem_map["ethmac"]), self.ethmac.bus)
         self.add_memory_region("ethmac", self.mem_map["ethmac"] | self.shadow_base, 0x2000)
 
@@ -510,21 +492,28 @@ class ZappySoC(SoCCore):
 
         # add the buzzer, fixed at resonant frequency for loudest alert
         self.submodules.buzzpwm = PWM(platform.request("buzzer_drv", 0))
+        self.add_csr("buzzpwm")
 
         # add I2C interface
         self.submodules.i2c = ZappyI2C(platform, platform.request("i2c", 0))
-
+        self.add_csr("i2c")
+        self.add_interrupt("i2c")
 
 
 
         # these are primarily for testing at the moment
         self.submodules.hvdac = ClockDomainsRenamer({"dac":"adc"})( Dac8560_csr(platform.request("hvdac", 0)) )
+        self.add_csr("hvdac")
         self.submodules.vmon = Adc121s101_csr(platform.request("vmon", 0))
+        self.add_csr("vmon")
         self.submodules.imon = Adc121s101_csr(platform.request("imon", 0))
+        self.add_csr("imon")
         self.submodules.hvengage = led.ClassicLed(platform.request("hv_engage", 0))
+        self.add_csr("hvengage")
 
-        memdepth = 32768
+        memdepth = 16384  # 8 RAMB36 per 8192 depth
         self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
+        self.add_csr("memtest")
         self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
         self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
 
@@ -540,6 +529,7 @@ class ZappySoC(SoCCore):
         ]
         # WHEN NOT USING ANALYZER, COMMENT OUT FOR FASTER COMPILE TIMES
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, clock_domain="sys", trigger_depth=8)
+        self.add_csr("analyzer")
     def do_exit(self, vns):
         self.analyzer.export_csv(vns, "test/analyzer.csv")
 

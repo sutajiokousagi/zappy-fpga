@@ -11,6 +11,7 @@
 
 #include "microudp.h"
 #include "../ethernet.h"
+#include "tftp.h"
 
 #ifdef LIBUIP
 #include <time.h>
@@ -200,7 +201,6 @@ void uip_log(char *msg)
 
 #endif // LIBUIP
 
-
 static void send_packet(void)
 {
 	/* wait buffer to be available */
@@ -236,6 +236,12 @@ static void send_packet(void)
 	/* update txslot / txbuffer */
 	txslot = (txslot+1)%ETHMAC_TX_SLOTS;
 	txbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * (ETHMAC_RX_SLOTS + txslot));
+}
+
+void send_packet_etherbone(unsigned char *raw, int rawlen) {
+  memcpy(txbuffer, raw, rawlen);
+  txlen = rawlen;
+  send_packet();
 }
 
 #ifdef LIBUIP
@@ -521,6 +527,7 @@ static int process_ip(void)
 	  //if(ntohs(rxbuffer->frame.contents.udp.ip.fragment_offset) != IP_DONT_FRAGMENT) return;
 	  if(udp_ip->ip.proto != IP_PROTO_UDP) return 1;
 	  if(ntohl(udp_ip->ip.dst_ip) != my_ip) return 1;
+	  if(ntohs(udp_ip->udp.dst_port) != TFTP_PORT_IN) return 1; // check that it's for TFTP, this is all we handle
 	  if(ntohs(udp_ip->udp.length) < sizeof(struct udp_header)) return 1;
 
 	  if(rx_callback) {

@@ -2,10 +2,7 @@
 #include <string.h>
 
 #include <net/microudp.h>
-#include <net/tftp.h>
-
-/* Local TFTP client port (arbitrary) */
-#define PORT_IN		7642
+#include "tftp.h"
 
 enum {
 	TFTP_RRQ	= 1,	/* Read request */

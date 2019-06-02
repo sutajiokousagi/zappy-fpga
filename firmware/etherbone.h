@@ -22,6 +22,7 @@
 #define ETHERBONE_HEADER_LENGTH 12
 
 struct tcp_socket etherbone_socket;
+struct udp_socket etherbone_udp;
 uint8_t etherbone_rx_buf[ETHERBONE_BUFFER_SIZE_RX];
 uint8_t etherbone_tx_buf[ETHERBONE_BUFFER_SIZE_TX];
 
@@ -70,6 +71,10 @@ void etherbone_write(unsigned int addr, unsigned int value);
 unsigned int etherbone_read(unsigned int addr);
 int etherbone_callback(struct tcp_socket *s, void *ptr, const char *rxbuf, int rxlen);
 void etherbone_process(struct tcp_socket *s, unsigned char *rxbuf);
-
+void etherbone_process_udp(struct udp_socket *s, unsigned char *rxbuf, const uip_ipaddr_t dest_addr, uint16_t dest_port);
+int etherbone_callback_udp(struct udp_socket *s, void *ptr, const uip_ipaddr_t *source_addr,
+			   uint16_t source_port, const uip_ipaddr_t *dest_addr, uint16_t dest_port,
+			   const uint8_t *data, uint16_t datalen);
+uint8_t etherbone_output_func(void);
 
 #endif

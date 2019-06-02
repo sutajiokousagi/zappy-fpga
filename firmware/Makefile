@@ -34,7 +34,7 @@ OBJECTS=isr.o \
 ifeq (yes,$(USE_UIP))
 	CFLAGS += -DLIBUIP
 	UIPFLAGS := -L./uip -luip
-	OBJECTS += telnet.o
+	OBJECTS += telnet.o etherbone.o
 endif
 
 

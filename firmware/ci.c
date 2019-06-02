@@ -191,11 +191,10 @@ void ci_service(void)
 	  unsigned int seed = strtoul(get_token(&str), NULL, 0);
 	  printf("Setting memory with seed value %08x\n", seed);
 	  memtest_seed_write(seed);
-	  memtest_count_write(32768 - 1);
+	  memtest_count_write(16384 - 1);
 	  memtest_update_write(1);
 	  while( memtest_done_read() == 0 )
 	    ;
-
 	} else if(strcmp(token, "i2c") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "test") == 0) {

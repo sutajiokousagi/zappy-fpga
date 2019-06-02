@@ -17,6 +17,7 @@
 #include "etherbone.h"
 #include "ethernet.h"
 #include "telnet.h"
+#include "etherbone.h"
 #include "uptime.h"
 #include "mdio.h"
 #include "version.h"
@@ -127,6 +128,7 @@ int main(void) {
 #ifdef LIBUIP
   arp_mode = ARP_LIBUIP;
   telnet_init();
+  etherbone_init();
 #endif
   
   processor_init();

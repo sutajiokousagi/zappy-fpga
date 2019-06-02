@@ -42,7 +42,7 @@
  * @{
  */
 
-#define DEBUG_PRINTF(...) /*printf(__VA_ARGS__)*/
+#define DEBUG_PRINTF(...) /* printf(__VA_ARGS__) */
 
 /*
  * uIP is a small implementation of the IP, UDP and TCP protocols (as
@@ -78,6 +78,8 @@
 #include "net/ipv4/uip-neighbor.h"
 
 #include <string.h>
+
+extern int etherbone_len;
 /*---------------------------------------------------------------------------*/
 /* Variable definitions. */
 
@@ -1925,7 +1927,7 @@ uip_process(uint8_t flag)
 #endif /* NETSTACK_CONF_WITH_IPV6 */
   DEBUG_PRINTF("Sending packet with length %d (%d)\n", uip_len,
 	       (BUF->len[0] << 8) | BUF->len[1]);
-
+  etherbone_len = (BUF->len[0] << 8) | BUF->len[1];
   UIP_STAT(++uip_stat.ip.sent);
   /* Return and let the caller do the actual transmission. */
   uip_flags = 0;
