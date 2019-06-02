@@ -17,11 +17,15 @@ void etherbone_init(void)
 {
 	callback_buf_length = 0;
 
+	// creates the socket (for UDP, it's just what to do on an Rx)
 	udp_socket_register(&etherbone_udp, NULL,
 		(udp_socket_input_callback_t) etherbone_callback_udp);
+	// map the socket to the actual port
 	udp_socket_bind(&etherbone_udp, ETHERBONE_PORT);
 
 	//// NOTE NOTE NOTE -- this "spoils" the uip stack for any other UDP responder
+	// etherbone_output_func() was written specifically for etherbone. This could be
+	// made more generic to handle multiple protocols...
 	tcpip_set_outputfunc(etherbone_output_func);
 	printf("Etherbone listening on UDP port %d\n", ETHERBONE_PORT);
 }
@@ -40,49 +44,7 @@ unsigned int etherbone_read(unsigned int addr)
 	return value;
 }
 
-int etherbone_callback(struct tcp_socket *s, void *ptr, const char *rxbuf, int rxlen)
-{
-	struct etherbone_packet *packet;
-	unsigned char * callback_buf_ptr;
-
-	memcpy(callback_buf + callback_buf_length, rxbuf, rxlen);
-	callback_buf_length += rxlen;
-	callback_buf_ptr = callback_buf;
-
-	while(callback_buf_length > 0) {
-		packet = (struct etherbone_packet *)(callback_buf_ptr);
-		/* seek header */
-		if(packet->magic != 0x4e6f) {
-			callback_buf_ptr++;
-			callback_buf_length--;
-		/* found header */
-		} else {
-			/* enough bytes for header? */
-			if(callback_buf_length > ETHERBONE_HEADER_LENGTH) {
-				unsigned int packet_length;
-				packet_length = ETHERBONE_HEADER_LENGTH;
-				if(packet->record_hdr.wcount)
-					packet_length += (1 + packet->record_hdr.wcount)*4;
-				if(packet->record_hdr.rcount)
-					packet_length += (1 + packet->record_hdr.rcount)*4;
-				/* enough bytes for packet? */
-				if(callback_buf_length >= packet_length) {
-					etherbone_process(s, callback_buf_ptr);
-					callback_buf_ptr += packet_length;
-					callback_buf_length -= packet_length;
-				} else {
-					memmove(callback_buf, callback_buf_ptr, callback_buf_length);
-					return 0;
-				}
-			} else {
-				memmove(callback_buf, callback_buf_ptr, callback_buf_length);
-				return 0;
-			}
-		}
-	}
-	return 0;
-}
-
+// this is the callback format specified by the uip stack...
 int etherbone_callback_udp(struct udp_socket *s, void *ptr, const uip_ipaddr_t *source_addr,
 			   uint16_t source_port, const uip_ipaddr_t *dest_addr, uint16_t dest_port,
 			   const uint8_t *data, uint16_t datalen)
@@ -134,54 +96,6 @@ int etherbone_callback_udp(struct udp_socket *s, void *ptr, const uip_ipaddr_t *
 	return 0;
 }
 
-void etherbone_process(struct tcp_socket *s, unsigned char *rxbuf)
-{
-	struct etherbone_packet *rx_packet = (struct etherbone_packet *)rxbuf;
-	struct etherbone_packet *tx_packet = (struct etherbone_packet *)etherbone_tx_buf;
-	unsigned int i;
-	unsigned int addr;
-	unsigned int data;
-	unsigned int rcount, wcount;
-
-	if(rx_packet->magic != 0x4e6f) return;   /* magic */
-	if(rx_packet->addr_size != 4) return;    /* 32 bits address */
-	if(rx_packet->port_size != 4) return;    /* 32 bits data */
-
-	rcount = rx_packet->record_hdr.rcount;
-	wcount = rx_packet->record_hdr.wcount;
-
-	if(wcount > 0) {
-		addr = rx_packet->record_hdr.base_write_addr;
-		for(i=0;i<wcount;i++) {
-			data = rx_packet->record[i].write_value;
-			etherbone_write(addr, data);
-			addr += 4;
-		}
-	}
-	if(rcount > 0) {
-		for(i=0;i<rcount;i++) {
-			addr = rx_packet->record[i].read_addr;
-			data = etherbone_read(addr);
-			tx_packet->record[i].write_value = data;
-		}
-		tx_packet->magic = 0x4e6f;
-		tx_packet->version = 1;
-		tx_packet->nr = 1;
-		tx_packet->pr = 0;
-		tx_packet->pf = 0;
-		tx_packet->addr_size = 4; // 32 bits
-		tx_packet->port_size = 4; // 32 bits
-		tx_packet->record_hdr.wcount = rcount;
-		tx_packet->record_hdr.rcount = 0;
-		tx_packet->record_hdr.base_write_addr = rx_packet->record_hdr.base_ret_addr;
-		tcp_socket_send(&etherbone_socket,
-						etherbone_tx_buf,
-						sizeof(*tx_packet) + rcount*sizeof(struct etherbone_record));
-	}
-
-	return;
-}
-
 static void dump_packet(struct etherbone_packet *p) {
   DEBUG_PRINTF("magic %02x\n", p->magic);
   DEBUG_PRINTF("version %02x\n", p->version);
@@ -208,20 +122,31 @@ static void dump_packet(struct etherbone_packet *p) {
   DEBUG_PRINTF("rh record %08x\n", p->record[0].read_addr);
 }
 
-void send_packet_etherbone(unsigned char *raw, int rawlen);
+// once the UIP stack is done adding CRCs and whatnot, it needs a hardware API
+// to actually send the packet. This is the API. We rely on the global variable
+// from the UIP library (uip_buf), which is basically a "raw" charbuf of the packet
+// and etherbone_len is a number computed by the UIP stack and passed here as a global
+// (UIP loves to pass data around as globals)...
+void send_packet_etherbone(unsigned char *raw, int rawlen);  // found in microudp.c
 int etherbone_len;
 uint8_t etherbone_output_func(void) {
   int i;
   DEBUG_PRINTF( "etherbone response packet:\n ");
-  for( i = 0; i < etherbone_len + 14; i++ ) {
-    DEBUG_PRINTF( "%02x ", uip_buf[i] );
+  for( i = 0; i < etherbone_len + 14; i++ ) { // <-- this 14 fudge factor comes from counting packet lengths in wireshark
+    DEBUG_PRINTF( "%02x ", uip_buf[i] );      // I'm not sure why it's necessary, to be honest, but it works...
   }
   DEBUG_PRINTF("\n");
-  send_packet_etherbone(uip_buf, etherbone_len + 14);
+  send_packet_etherbone(uip_buf, etherbone_len + 14); // this API is in the microudp.c file (not the UIP stack)
+  // we have to call a helper function because we need to initialize some static-scoped variables in microudp.c to get
+  // this to work
+  
+  // microudp "wraps" the UIP layer, as it implements the baseline TFTP which allows us to boot absent all other services
 
   return 0;
 }
 
+
+// this is the core processing function. needs to know the source addr/port so it knows where to return a read.
 void etherbone_process_udp(struct udp_socket *s, unsigned char *rxbuf, const uip_ipaddr_t source_addr, uint16_t source_port)
 {
 	struct etherbone_packet *rx_packet = (struct etherbone_packet *)rxbuf;
@@ -272,18 +197,17 @@ void etherbone_process_udp(struct udp_socket *s, unsigned char *rxbuf, const uip
 	  tx_packet->record_hdr.wcount = rcount;
 	  tx_packet->record_hdr.rcount = 0;
 	  tx_packet->record_hdr.base_write_addr = uip_htonl(rx_packet->record_hdr.base_ret_addr);
-	  ((unsigned char *)tx_packet)[2] = 0x14;
+	  ((unsigned char *)tx_packet)[2] = 0x14; // this override is necessary because the bit-packing trick on the struct is broken
 	  DEBUG_PRINTF("tx_packet:\n");
 	  dump_packet( tx_packet );
-	  //printf( "source_addr: %x\n", source_addr );
 	  tx_socket.udp_conn->ripaddr = source_addr;
 	  tx_socket.udp_conn->rport = uip_htons(source_port);
 	  tx_socket.udp_conn->ttl = s->udp_conn->ttl;
-	  //printf( "ripaddr: %x\n", tx_socket.udp_conn->ripaddr );
 	  DEBUG_PRINTF( "ripaddr: %x\n", tx_socket.udp_conn->ripaddr );
 	  DEBUG_PRINTF( "lport: %d\n", tx_socket.udp_conn->lport );
 	  DEBUG_PRINTF( "rport: %d\n", tx_socket.udp_conn->rport );
 	  DEBUG_PRINTF( "ttl: %d\n", tx_socket.udp_conn->ttl );
+	  // this call jumps into the UIP stack where CRCs and what not get glommed around the packet
 	  udp_socket_send(&tx_socket,
 			  tx_packet,
 			  sizeof(*tx_packet) + rcount*sizeof(struct etherbone_record));

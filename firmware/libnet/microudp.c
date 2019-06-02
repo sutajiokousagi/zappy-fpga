@@ -238,6 +238,7 @@ static void send_packet(void)
 	txbuffer = (ethernet_buffer *)(ETHMAC_BASE + ETHMAC_SLOT_SIZE * (ETHMAC_RX_SLOTS + txslot));
 }
 
+// this thunk allows us to access the static variables in microudp.c to prepare data for send_packet()
 void send_packet_etherbone(unsigned char *raw, int rawlen) {
   memcpy(txbuffer, raw, rawlen);
   txlen = rawlen;
