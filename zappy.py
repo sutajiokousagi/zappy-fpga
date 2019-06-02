@@ -528,7 +528,7 @@ class ZappySoC(SoCCore):
             self.vmon.valid.status,
         ]
         # WHEN NOT USING ANALYZER, COMMENT OUT FOR FASTER COMPILE TIMES
-        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, clock_domain="sys", trigger_depth=8)
+        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, clock_domain="sys")
         self.add_csr("analyzer")
     def do_exit(self, vns):
         self.analyzer.export_csv(vns, "test/analyzer.csv")
