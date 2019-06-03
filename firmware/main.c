@@ -14,16 +14,63 @@
 
 #include "ci.h"
 #include "processor.h"
-#include "etherbone.h"
-#include "ethernet.h"
-#include "telnet.h"
-#include "etherbone.h"
 #include "uptime.h"
 #include "mdio.h"
 #include "version.h"
 
+#include "ethernet.h"
+#ifdef LIBUIP
+#include "telnet.h"
+#include "etherbone.h"
+#endif
+
 #include "libnet/microudp.h"
 #include "libnet/tftp.h"
+
+#include "gfxconf.h"
+#include "gfx.h"
+#include "ginkgo-logo.h"
+#include "src/gdisp/gdisp_driver.h"
+void oled_banner(void);
+void oled_banner(void) {
+#if 1
+  coord_t width, fontheight;
+  font_t font;
+
+  width = gdispGetWidth();
+  font = gdispOpenFont("UI2");
+  fontheight = gdispGetFontMetric(font, fontHeight);
+
+  gdispClear(Black);
+  gdispDrawStringBox(0, fontheight, width, fontheight * 2,
+                     "Zappy", font, White, justifyCenter);
+  gdispDrawStringBox(0, fontheight * 2, width, fontheight * 3,
+                     "EVT1", font, Gray, justifyCenter);
+
+  GDisplay *g = gdispGetDisplay(0);
+  uint8_t *ram = g->priv;
+  memcpy(ram, &ginkgo_logo[119], 8192);
+  g->flags | (GDISP_FLG_DRIVER<<0);
+  
+  gdispFlush();
+  gdispCloseFont(font);
+#else
+  gdispImage myImage;
+  coord_t swidth, sheight;
+  
+  swidth = gdispGetWidth();
+  sheight = gdispGetHeight();
+
+  printf("file exists: %d\n", gfileExists("ginkgo-logo.bmp"));
+  printf("file opened: %d\n", gdispImageOpenFile(&myImage, "ginkgo-logo.bmp"));
+  gdispImageDraw(&myImage, 0, 0, swidth, sheight, 0, 0);
+  printf("image drawn\n" );
+  gdispFlush();
+  printf("image flushed\n" );
+  gdispImageClose(&myImage);
+#endif
+}
+
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -143,6 +190,9 @@ int main(void) {
   buzzpwm_enable_write(0);
   buzzpwm_period_write(SYSTEM_CLOCK_FREQUENCY / 3100);
   buzzpwm_width_write( (SYSTEM_CLOCK_FREQUENCY / 3100) / 2 );
+
+  gfxInit();
+  oled_banner();
 
   while(1) {
     uptime_service();

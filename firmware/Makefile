@@ -5,20 +5,7 @@ include $(SOC_DIRECTORY)/software/common.mak
 
 include uip/Makefile.mk
 
-# UIP enables telnet but adds about 25kiB
-# after changing, need to do a make clean.
-USE_UIP:=yes
-
-# prepend our local files to override system ones
-CFLAGS := -I. -I../third_party/libuip -Iuip $(CFLAGS)
-
-ifeq ($(OS),Windows_NT)
-COPY := cmd /c copy
-else
-COPY := cp
-endif
-
-OBJECTS=isr.o \
+OBJECTS=	isr.o \
 		processor.o \
 		ci.o \
 		i2c.o \
@@ -30,13 +17,41 @@ OBJECTS=isr.o \
 	        version_data.o \
 		stdio_wrap.o \
 		si1153.o \
+		gfxapi.o \
+#                assets/rawdata.o \
 
-ifeq (yes,$(USE_UIP))
-	CFLAGS += -DLIBUIP
-	UIPFLAGS := -L./uip -luip
-	OBJECTS += telnet.o etherbone.o
+# prepend our local files to override system ones
+CFLAGS := -I. $(CFLAGS) -fdata-sections -ffunction-sections
+
+# UIP enables telnet but adds about 25kiB
+# after changing, need to do a make clean.
+USE_UIP:=no
+
+# GFX enables uGFX for OLED display
+USE_GFX:=yes
+
+ifeq (yes,$(USE_GFX))
+	GFXDIR := /home/bunnie/code/zappy-fpga/third_party/ugfx
+        UGFXLIBS := -L$(GFXDIR)/.build -lzappy -Lriscv -lc_nano
+	GFXDEPLIBS := $(GFXDIR)/.build/libzappy.a
+
+	CFLAGS += -DGFX_USE_OS_RAW32=GFXON  -I$(GFXDIR) -I$(GFXDIR)/drivers/gdisp/SSD1322 -Iassets
+	GFXDEFS += -DGFX_USE_OS_RAW32=GFXON
 endif
 
+ifeq (yes,$(USE_UIP))
+	UIPFLAGS := -L./uip -luip
+        UIPDIR := /home/bunnie/code/zappy-fpga/third_party/libuip
+
+	OBJECTS += telnet.o etherbone.o
+	CFLAGS += -DLIBUIP -I$(UIPDIR) -Iuip 
+endif
+
+ifeq ($(OS),Windows_NT)
+COPY := cmd /c copy
+else
+COPY := cp
+endif
 
 all: firmware.bin
 
@@ -50,7 +65,8 @@ ifneq ($(OS),Windows_NT)
 endif
 	$(COPY) $@ boot.bin
 
-firmware.elf: $(OBJECTS)  uip/libuip.a libnet/libnet.a
+
+firmware.elf: $(OBJECTS) uip/libuip.a libnet/libnet.a $(GFXDEPLIBS)
 	$(LD) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
@@ -61,11 +77,16 @@ firmware.elf: $(OBJECTS)  uip/libuip.a libnet/libnet.a
 		-lbase-nofloat -lcompiler_rt -Map=firmware.map \
 		-L./libnet \
 		-lnet \
-		$(UIPFLAGS)
+                $(UGFXLIBS) \
+		$(UIPFLAGS) \
+		--gc-sections
 
 ifneq ($(OS),Windows_NT)
 	chmod -x $@
 endif
+
+$(GFXDIR)/.build/libzappy.a: gfxconf.h
+	$(MAKE) -C $(GFXDIR)
 
 libnet/libnet.a: libnet/microudp.c libnet/tftp.c
 	$(MAKE) -C libnet/ USE_UIP=$(USE_UIP)
@@ -76,7 +97,9 @@ uip/libuip.a:
 main.o: main.c
 	$(compile)
 
-%.o: %.c
+assets/ginkgo-logo.h: assets/ginkgo-logo.bmp
+	$(GFXDIR)/tools/file2c/src/file2c -dcs -n ginkgo_logo assets/ginkgo-logo.bmp assets/ginkgo-logo.h
+%.o: %.c assets/ginkgo-logo.h
 	$(compile)
 
 %.o: %.S
@@ -86,8 +109,9 @@ load: firmware.bin
 	litex_term --kernel firmware.bin COM8
 
 clean:
-	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~ uip/*.o uip/*.a libnet/*.o libnet/*.a
+	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~ uip/*.o uip/*.a libnet/*.o libnet/*.a assets/ginkgo-logo.h
 	$(MAKE) -C uip/ clean
+	$(MAKE) -C $(GFXDIR) clean
 
 # Dependencies on generated files
 version.o: version_data.h version_data.c

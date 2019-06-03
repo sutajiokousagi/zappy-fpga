@@ -48,6 +48,15 @@ SECTIONS
 		_ebss = .;
 		_end = .;
 	} > main_ram
+
+/*
+	.data :
+	{
+	   . = ALIGN(4);
+	   __ginkgo_logo__ = .;
+	   *(.rawdata*)
+	} > main_ram */
 }
 
 PROVIDE(_fstack = ORIGIN(sram) + LENGTH(sram) - 4);
+/* PROVIDE(_fstack = ORIGIN(main_ram) + LENGTH(main_ram) - 4); */

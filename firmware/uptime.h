@@ -3,6 +3,7 @@
 
 void uptime_service(void);
 int uptime(void);
+uint32_t uptime_ms(void);
 
 void uptime_print(void);
 const char* uptime_str(void);

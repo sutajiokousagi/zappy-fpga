@@ -41,6 +41,7 @@ from gateware.adc121s101 import Zappy_memtest, Adc121s101_csr
 from gateware.dac8560 import Dac8560_csr
 from gateware.pwm import PWM
 from gateware.zappy_i2c import ZappyI2C
+from gateware.oled import OLED
 
 _io = [
     # ADCs
@@ -113,11 +114,11 @@ _io = [
 
     # SPI to display
     ("oled", 0,
-        Subsignal("cs_n", 0, Pins("G1"), IOStandard("LVCMOS33")),
-        Subsignal("dc", 0, Pins("H2"), IOStandard("LVCMOS33")),
-        Subsignal("res", 0, Pins("G4"), IOStandard("LVCMOS33")),
-        Subsignal("sclk", 0, Pins("J2"), IOStandard("LVCMOS33")),
-        Subsignal("sdin", 0, Pins("H1"), IOStandard("LVCMOS33")),
+        Subsignal("cs_n", Pins("G1"), IOStandard("LVCMOS33"), Misc("DRIVE=4"), Misc("SLEW=SLOW")),
+        Subsignal("dc", Pins("H2"), IOStandard("LVCMOS33"), Misc("DRIVE=4"), Misc("SLEW=SLOW")),
+        Subsignal("res", Pins("G4"), IOStandard("LVCMOS33"), Misc("DRIVE=4"), Misc("SLEW=SLOW")),
+        Subsignal("sclk", Pins("J2"), IOStandard("LVCMOS33"), Misc("DRIVE=4"), Misc("SLEW=SLOW")),
+        Subsignal("sdin", Pins("H1"), IOStandard("LVCMOS33"), Misc("DRIVE=4"), Misc("SLEW=SLOW")),
     ),
 
     # SPI Flash
@@ -499,6 +500,9 @@ class ZappySoC(SoCCore):
         self.add_csr("i2c")
         self.add_interrupt("i2c")
 
+        # add OLED interface
+        self.submodules.oled = OLED(platform.request("oled", 0))
+        self.add_csr("oled")
 
 
         # these are primarily for testing at the moment

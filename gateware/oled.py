@@ -161,6 +161,7 @@ class OLED(Module, AutoCSR):
         self.submodules.spi = SPIMaster(spi_pads, 8, div=16, cpha=0)
         self.comb += [
             pads.sclk.eq(spi_pads.clk),
-            pads.sdin.eq(spi_pads.mosi)
+            pads.sdin.eq(spi_pads.mosi),
+            pads.cs_n.eq(spi_pads.cs_n),
         ]
-        self.submodules.gpio = GPIOOut(Cat(pads.res, pads.dc, pads.vbat, pads.vdd))
+        self.submodules.gpio = GPIOOut(Cat(pads.res, pads.dc))

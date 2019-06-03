@@ -4,8 +4,10 @@
 #ifndef __ETHERNET_H
 #define __ETHERNET_H
 
+#ifdef LIBUIP
 #include "contiki.h"
 #include "contiki-net.h"
+#endif
 
 //#define LIBUIP  // include the UIP-specific hooks on top of microudp (define in Makefile)
 //#define UIP_DEBUG

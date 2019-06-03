@@ -10,6 +10,7 @@
 #include <time.h>
 
 #include "processor.h"
+#include "i2c.h"
 
 void processor_init(void) {
   i2c_init();

@@ -21,8 +21,30 @@
 #include <net/microudp.h>
 #include <net/tftp.h>
 #include "ethernet.h"
+
 #include "i2c.h"
 #include "si1153.h"
+
+#include "gfxconf.h"
+#include "gfx.h"
+
+
+void oled_test(void) {
+  coord_t width, fontheight;
+  font_t font;
+
+  width = gdispGetWidth();
+  font = gdispOpenFont("UI2");
+  fontheight = gdispGetFontMetric(font, fontHeight);
+
+  gdispClear(Black);
+  gdispDrawStringBox(0, fontheight, width, fontheight * 2,
+                     "Zappy", font, White, justifyCenter);
+  gdispDrawStringBox(0, fontheight * 2, width, fontheight * 3,
+                     "EVT1", font, White, justifyCenter);
+  gdispFlush();
+  gdispCloseFont(font);
+}
 
 static i2cSensorConfig_t sensI2C;			//Holds i2c information about the connected sensor
 static Si115xSample_t samples;				//Stores the sample data from reading the sensor
@@ -234,6 +256,10 @@ void ci_service(void)
 	    printf( "Tempertaure: %d.%dC\n", longtemp / 10000, remainder / 1000 );
 	  } else {
 	    printf( "i2c subcommand not recognized\n" );
+	  }
+	} else if(strcmp(token, "oled_loop") == 0) {
+	  while(1) {
+	    oled_test();
 	  }
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
