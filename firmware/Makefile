@@ -25,7 +25,7 @@ CFLAGS := -I. $(CFLAGS) -fdata-sections -ffunction-sections
 
 # UIP enables telnet but adds about 25kiB
 # after changing, need to do a make clean.
-USE_UIP:=no
+USE_UIP:=yes
 
 # GFX enables uGFX for OLED display
 USE_GFX:=yes

@@ -31,9 +31,18 @@
 #include "gfx.h"
 #include "ginkgo-logo.h"
 #include "src/gdisp/gdisp_driver.h"
+
+void oled_logo(void) {
+  GDisplay *g = gdispGetDisplay(0);
+  uint8_t *ram = g->priv;
+  memcpy(ram, &ginkgo_logo[119], 8192);
+  g->flags | (GDISP_FLG_DRIVER<<0);
+  
+  gdispFlush();
+}
+
 void oled_banner(void);
 void oled_banner(void) {
-#if 1
   coord_t width, fontheight;
   font_t font;
 
@@ -43,32 +52,13 @@ void oled_banner(void) {
 
   gdispClear(Black);
   gdispDrawStringBox(0, fontheight, width, fontheight * 2,
-                     "Zappy", font, White, justifyCenter);
+                     "Zappy", font, Gray, justifyCenter);
   gdispDrawStringBox(0, fontheight * 2, width, fontheight * 3,
                      "EVT1", font, Gray, justifyCenter);
 
-  GDisplay *g = gdispGetDisplay(0);
-  uint8_t *ram = g->priv;
-  memcpy(ram, &ginkgo_logo[119], 8192);
-  g->flags | (GDISP_FLG_DRIVER<<0);
-  
-  gdispFlush();
   gdispCloseFont(font);
-#else
-  gdispImage myImage;
-  coord_t swidth, sheight;
   
-  swidth = gdispGetWidth();
-  sheight = gdispGetHeight();
-
-  printf("file exists: %d\n", gfileExists("ginkgo-logo.bmp"));
-  printf("file opened: %d\n", gdispImageOpenFile(&myImage, "ginkgo-logo.bmp"));
-  gdispImageDraw(&myImage, 0, 0, swidth, sheight, 0, 0);
-  printf("image drawn\n" );
   gdispFlush();
-  printf("image flushed\n" );
-  gdispImageClose(&myImage);
-#endif
 }
 
 
