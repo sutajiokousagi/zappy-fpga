@@ -1,15 +1,20 @@
 [submodule "deps/litex"]
 	path = deps/litex
-	url = https://github.com/enjoy-digital/litex.git
+	url = git@github.com:sutajiokousagi/litex.git
+	branch = kosagi_master
 [submodule "deps/litescope"]
 	path = deps/litescope
 	url = https://github.com/enjoy-digital/litescope.git
+	master = master
 [submodule "deps/liteeth"]
 	path = deps/liteeth
 	url = https://github.com/enjoy-digital/liteeth.git
+	master = master
 [submodule "deps/migen"]
 	path = deps/migen
 	url = https://github.com/m-labs/migen.git
+	master = master
 [submodule "deps/litedram"]
 	path = deps/litedram
 	url = https://github.com/enjoy-digital/litedram.git
+	master = master
