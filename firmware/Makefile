@@ -30,6 +30,9 @@ USE_UIP:=yes
 # GFX enables uGFX for OLED display
 USE_GFX:=yes
 
+# use IQ motor
+USE_IQ:=no
+
 ifeq (yes,$(USE_GFX))
 	GFXDIR := /home/bunnie/code/zappy-fpga/third_party/ugfx
         UGFXLIBS := -L$(GFXDIR)/.build -lzappy -Lriscv -lc_nano
@@ -45,6 +48,14 @@ ifeq (yes,$(USE_UIP))
 
 	OBJECTS += telnet.o etherbone.o
 	CFLAGS += -DLIBUIP -I$(UIPDIR) -Iuip 
+endif
+
+ifeq (yes,$(USE_IQ))
+	IQFLAGS := -L./iq -liq
+	IQDIR := /home/bunnie/code/zappy-fpga/iq
+
+	OBJECTS += motor.o
+	CFLAGS += -DMOTOR -I$(IQDIR) -Iiq
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -79,6 +90,7 @@ firmware.elf: $(OBJECTS) uip/libuip.a libnet/libnet.a $(GFXDEPLIBS)
 		-lnet \
                 $(UGFXLIBS) \
 		$(UIPFLAGS) \
+	 	$(IQFLAGS) \
 		--gc-sections
 
 ifneq ($(OS),Windows_NT)
@@ -93,6 +105,9 @@ libnet/libnet.a: libnet/microudp.c libnet/tftp.c
 
 uip/libuip.a: 
 	$(MAKE) -C uip/
+
+iq/libiq.a:
+	$(MAKE) -C iq/
 
 main.o: main.c
 	$(compile)

@@ -24,6 +24,7 @@
 
 #include "i2c.h"
 #include "si1153.h"
+#include "motor.h"
 
 #include "gfxconf.h"
 #include "gfx.h"
@@ -287,6 +288,11 @@ void ci_service(void)
 	  } else {
 	    help_debug();
 	  }
+#ifdef MOTOR	  
+	} else if(strcmp(token, "motor") == 0 ) {
+	  token = get_token(&str);
+	  do_motor(token);
+#endif
 	} else if(strcmp(token, "oprox") == 0 ) {
 	  token = get_token(&str);
 	  if(strcmp(token, "init") == 0) {
