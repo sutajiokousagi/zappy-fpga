@@ -23,6 +23,7 @@ from litex.build.xilinx import XilinxPlatform, VivadoProgrammer
 from litex.soc.integration.builder import *
 
 from litex.soc.cores import spi_flash
+from litex.soc.cores import uart
 
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
@@ -37,7 +38,7 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 
 from gateware import info
 from gateware import led
-from gateware.adc121s101 import Zappy_memtest, Adc121s101_csr
+from gateware.adc121s101 import Adc121s101_csr, Zappy_adc
 from gateware.dac8560 import Dac8560_csr
 from gateware.pwm import PWM
 from gateware.zappy_i2c import ZappyI2C
@@ -411,7 +412,7 @@ class ZappySoC(SoCCore):
     mem_map = {
         "spiflash": 0x20000000,  # (default shadow @0xa0000000)
         "ethmac":   0x30000000,  # (shadow @0xb0000000)
-        "memtest":  0x50000000,
+        "monitor":  0x50000000,  # was: memtest
     }
     mem_map.update(SoCCore.mem_map)
 
@@ -504,6 +505,20 @@ class ZappySoC(SoCCore):
         self.submodules.oled = OLED(platform.request("oled", 0))
         self.add_csr("oled")
 
+        # add motor UART interface
+        self.submodules.motor_phy = uart.RS232PHY(platform.request("mot", 0), clk_freq, 115200)
+        self.submodules.motor = ResetInserter()(uart.UART(self.motor_phy))
+        self.add_csr("motor_phy", allow_user_defined=True)
+        self.add_csr("motor", allow_user_defined=True)
+        self.add_interrupt("motor", allow_user_defined=True)
+
+        # add zap monitoring interface
+        memdepth = 16384
+        self.submodules.monitor = Zappy_adc(platform.request("adc", 0), platform.request("fadc", 0), memdepth=memdepth)
+        self.add_csr("monitor")
+        self.add_wb_slave(mem_decoder(self.mem_map["monitor"]), self.monitor.bus)
+        self.add_memory_region("monitor", self.mem_map["monitor"] | self.shadow_base, memdepth * 4) # because dw = 32
+        self.add_interrupt("monitor")
 
         # these are primarily for testing at the moment
         self.submodules.hvdac = ClockDomainsRenamer({"dac":"adc"})( Dac8560_csr(platform.request("hvdac", 0)) )
@@ -515,11 +530,11 @@ class ZappySoC(SoCCore):
         self.submodules.hvengage = led.ClassicLed(platform.request("hv_engage", 0))
         self.add_csr("hvengage")
 
-        memdepth = 16384  # 8 RAMB36 per 8192 depth
-        self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
-        self.add_csr("memtest")
-        self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
-        self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
+#        memdepth = 16384  # 8 RAMB36 per 8192 depth
+#        self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
+#        self.add_csr("memtest")
+#        self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
+#        self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
 
         from litescope import LiteScopeAnalyzer
 
