@@ -159,9 +159,11 @@ class Adc121s101_csr(Module, AutoCSR):
 
 #   REFACTOR THIS to target the ethernet TFTP transfer routine cleanly
 #   MEMORY
-#class Zappy_adc(Module, AutoCSR):
-#    def __init__(self, pads):
-#        self.submodules.adc = Adc121s101(pads)
+class Zappy_adc(Module, AutoCSR):
+    def __init__(self, adc_pads, fadc_pads):
+        self.submodules.adc = Adc121s101(adc_pads)
+        self.sudmodules.fadc = Adc121s101(fadc_pads)
+        
 
 
 #  CSR update (wo) - writing anything triggers memory values to update
@@ -172,7 +174,7 @@ class Adc121s101_csr(Module, AutoCSR):
 #  self.*mem* `Memory()` - memdepthx32 memory, one local write-only port allocated, one wishbone read-only port allocated
 class Zappy_memtest(Module, AutoCSR):
     def __init__(self, memdepth=2048):
-        mem = Memory(32, memdepth)  # looks like memdepth is in bytes, not dw words
+        mem = Memory(32, memdepth)
         port = mem.get_port(write_capable=True)
         # self.specials.mem = mem  # if you do this, it creates an autoCSR of <instancename>_mem where you can access the memory
         # but, you can only make a read port to access it otherwise you get a synthesis error as there is no template primitive
