@@ -163,7 +163,7 @@ class Zappy_adc(Module, AutoCSR):
     def __init__(self, adc_pads, fadc_pads):
         self.submodules.adc = Adc121s101(adc_pads)
         self.sudmodules.fadc = Adc121s101(fadc_pads)
-        
+
 
 
 #  CSR update (wo) - writing anything triggers memory values to update
