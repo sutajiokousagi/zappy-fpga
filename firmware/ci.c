@@ -165,6 +165,7 @@ void ci_service(void)
 	char *token;
 	char dummy[] = "dummy";
 	int was_dummy = 0;
+	int depth = 1024;  // this is used by the acquire & upload routine
 	
 	status_service();
 
@@ -197,19 +198,34 @@ void ci_service(void)
 	else if(strcmp(token, "upload") == 0) {
 	  // send up 1 megabyte of data to benchmark upload speed
 	  unsigned int ip;
+	  int i;
+	  ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
+	  // send a megabyte
+	  int start, stop;
+	  elapsed(&start, -1);
+	  tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)MONITOR_BASE, depth*4);
+	  elapsed(&stop, -1);
+	  i = stop - start;
+	  if( i < 0 ) i += timer0_reload_read();
+	  printf("Elapsed ticks for log upload: %d, or %dms per megabyte\n",
+		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
+	} else if(strcmp(token, "benchmark") == 0) {
+	  // send up 1 megabyte of data to benchmark upload speed
+	  unsigned int ip;
 	  ip = IPTOINT(host_ip_addr[0], host_ip_addr[1], host_ip_addr[2], host_ip_addr[3]);
 	  int i;
 	  // send a megabyte
 	  int start, stop;
 	  elapsed(&start, -1);
 	  for( i = 0; i < 32; i++ ) {
-	    tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-log.1", (void *)0x40000000, 32*1024);
+	    tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, "zappy-bwtest.1", (void *)MAIN_RAM_BASE, 4*1024);
 	  }
 	  elapsed(&stop, -1);
 	  i = stop - start;
 	  if( i < 0 ) i += timer0_reload_read();
 	  printf("Elapsed ticks for 1MiB: %d, or %dms per megabyte\n",
 		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
+#if 0	   // for the memtester module, leave this around until we've validated the ADC capture memory module
 	} else if(strcmp(token, "seed") == 0) {
 	  unsigned int seed = strtoul(get_token(&str), NULL, 0);
 	  printf("Setting memory with seed value %08x\n", seed);
@@ -218,6 +234,26 @@ void ci_service(void)
 	  memtest_update_write(1);
 	  while( memtest_done_read() == 0 )
 	    ;
+#endif
+	} else if(strcmp(token, "acquire") == 0) {
+	  int acq_timer, start_time;
+	  printf("Testing acquisition with depth %d\n", depth);
+	  monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
+	  monitor_depth_write(depth);
+	  elapsed(&acq_timer, -1);
+	  start_time = acq_timer;
+	  monitor_acquire_write(1); // start acquisition
+	  while( monitor_done_read() ) // wait for done to go 0
+	    ;
+	  while( monitor_done_read() == 0 ) // wait for done to go back to a 1
+	    ;
+	  elapsed(&acq_timer, -1);
+	  int delta = acq_timer - start_time;
+	  if( delta < 0 )
+	    delta += timer0_reload_read();
+	  printf("Acquisition finished in %d ticks or %d ms. Overrun status: %d\n", delta, (delta)*1000/SYSTEM_CLOCK_FREQUENCY,
+		 monitor_overrun_read());
+	  printf("Run 'upload' to get a copy of the data\n");
 	} else if(strcmp(token, "i2c") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "test") == 0) {
