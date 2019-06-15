@@ -61,6 +61,10 @@ class Adc121s101(Module):
                 If(self.ready,
                    NextState("IDLE"),
                    NextValue(self.valid, 0),
+                ).Elif(go, # allow repeated acquire without acknowledgement
+                   NextState("ACQUIRE"),
+                   NextValue(self.valid, 0),
+                   NextValue(count, 0),
                 ).Else(
                    NextValue(self.valid, 1),
                 )
@@ -180,12 +184,12 @@ class Zappy_adc(Module, AutoCSR):
         mem = Memory(32, memdepth)
         port = mem.get_port(write_capable=True)
         self.specials += port
-        adr = Signal(log2_int(memdepth))  # should be measured in dw-width words
+        self.adr = adr = Signal(log2_int(memdepth))  # should be measured in dw-width words
         data = Signal(32)
         we = Signal()
 
-        sampletimer = Signal(32)
-        sample_reset = Signal()
+        self.sampletimer = sampletimer = Signal(32)
+        self.sample_reset = sample_reset = Signal()
         self.sync += [
             If(sample_reset,
                sampletimer.eq(0),
@@ -195,9 +199,9 @@ class Zappy_adc(Module, AutoCSR):
         ]
 
         fsm = FSM(reset_state="IDLE")
-        self.submodules += fsm
+        self.submodules.fsm = fsm
 
-        count = Signal(16)
+        self.count = count = Signal(16)
         zeropad = Signal(4)
         self.comb += zeropad.eq(0)
 
@@ -227,28 +231,24 @@ class Zappy_adc(Module, AutoCSR):
                 )
         )
         fsm.act("WAITVALID", # wait for ADC to present valid data, then copy it to the data register
+                NextValue(pulsetimer, 0), # reset the pulse timer in case we loop back to ACQUIRE state without going through IDLE
                 If(adc_valid_sync & fadc_valid_sync,
                    NextValue(data, Cat(self.adc.data, zeropad, self.fadc.data, zeropad)),
-                   NextState("ACK"),
-                )
-        )
-        fsm.act("ACK", # wait for ADC to acknowledge that data was received, and can start a new cycle
-                If( ~(adc_valid_sync | fadc_valid_sync),
-                    NextValue(self.adc.ready, 0),
-                    NextValue(self.fadc.ready, 0),
-                    NextState("SAMPLING_WAIT"),
-                    we.eq(1), # commit the data to RAM
+                   NextValue(self.adc.ready, 0),
+                   NextValue(self.fadc.ready, 0),
+                   NextState("SAMPLING_WAIT"),
                 )
         )
         fsm.act("SAMPLING_WAIT", # wait until the next sample period
+                we.eq(1),  # commit the data to RAM
                 # the >= catches the case that waiting for the ADC to finish took longer than the specified period
-                If(sampletimer >= self.period.storage,
+                If(sampletimer >= (self.period.storage-2),
                    NextState("INCREMENT")
                 ),
                 # note the statement above is >=, so if sampletimer starts below period, the next
                 # statement won't happen and the overrun will be 0
                 # this statemen runs in parallel with the above statement.
-                If(sampletimer > self.period.storage,
+                If(sampletimer > (self.period.storage-2),
                    NextValue(self.overrun.status, sampletimer - self.period.storage)
                 ).Else(
                     NextValue(self.overrun.status, 0)

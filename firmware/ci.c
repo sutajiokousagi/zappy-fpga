@@ -165,7 +165,7 @@ void ci_service(void)
 	char *token;
 	char dummy[] = "dummy";
 	int was_dummy = 0;
-	int depth = 1024;  // this is used by the acquire & upload routine
+	int depth = 10000;  // this is used by the acquire & upload routine
 	
 	status_service();
 
@@ -207,8 +207,8 @@ void ci_service(void)
 	  elapsed(&stop, -1);
 	  i = stop - start;
 	  if( i < 0 ) i += timer0_reload_read();
-	  printf("Elapsed ticks for log upload: %d, or %dms per megabyte\n",
-		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
+	  printf("Elapsed ticks for log upload: %d, or %dms for %d bytes\n",
+		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY, depth*4);
 	} else if(strcmp(token, "benchmark") == 0) {
 	  // send up 1 megabyte of data to benchmark upload speed
 	  unsigned int ip;

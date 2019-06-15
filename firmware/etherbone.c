@@ -8,7 +8,7 @@
 #include "etherbone.h"
 #include "ethernet.h"
 
-#define DEBUG_PRINTF(...) /* printf(__VA_ARGS__)  */
+#define DEBUG_PRINTF(...) /*printf(__VA_ARGS__) */
 
 static unsigned char callback_buf[1512];
 static unsigned int callback_buf_length;

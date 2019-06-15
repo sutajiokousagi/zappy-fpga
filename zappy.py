@@ -539,12 +539,11 @@ class ZappySoC(SoCCore):
         from litescope import LiteScopeAnalyzer
 
         analyzer_signals = [
-            self.vmon.adc.dout,
-            self.vmon.adc.cs_n,
-            self.vmon.adc.dbg_sclk,
-            self.vmon.acquire.storage,
-            self.vmon.data.status,
-            self.vmon.valid.status,
+            self.monitor.fsm,
+            self.monitor.sample_reset,
+            self.monitor.sampletimer,
+            self.monitor.adr,
+            self.monitor.count,
         ]
         # WHEN NOT USING ANALYZER, COMMENT OUT FOR FASTER COMPILE TIMES
         self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 256, clock_domain="sys")
