@@ -1,8 +1,17 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include <string.h>
+
+#include <irq.h>
+#include <uart.h>
+#include <time.h>
+#include <generated/csr.h>
+#include <generated/mem.h>
+#include <hw/flags.h>
+#include <console.h>
+#include <system.h>
+
 #include <errno.h>
 #include <string.h>
 #include <math.h>
@@ -12,14 +21,16 @@
 //#include <linux/limits.h>
 
 #include "iqmotor.h"
+#include "motor.h"
 
 static struct iqMotor motor_storage;
 static struct iqMotor *motor;
 
-struct timespec ts_ref = {0, 0};
+size_t write(int fd, const void *buf, size_t count);
+size_t read(int fd, const void *buf, size_t count);
 
-void iqCreateMotor(void) {
-  motor = &iqm_storage;
+EXTERNC void iqCreateMotor(void) {
+  motor = &motor_storage;
   
   motor->iq_com = new GenericInterface();
   motor->mta_client = new MultiTurnAngleControlClient(0);
@@ -28,7 +39,7 @@ void iqCreateMotor(void) {
 }
 
 
-int iqSetCoast( void ) {
+EXTERNC int iqSetCoast( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   // Stores length of message to send or receive
@@ -46,7 +57,7 @@ int iqSetCoast( void ) {
 }
 
 
-double iqReadAngle( void ) {
+EXTERNC double iqReadAngle( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   uint8_t communication_buffer_out[IQ_BUFLEN];
@@ -65,10 +76,10 @@ double iqReadAngle( void ) {
   if(motor->iq_com->GetTxBytes(communication_buffer_in, communication_length_in)) {
     write(motor->fd, communication_buffer_in, communication_length_in);
   } else {
-    return NAN;
+    return -1; // should be NAN...
   }
   
-  usleep((useconds_t) 1 * 1000); // delay 1ms for serial data to transmit data...
+  delay(1); // delay 1ms for serial data to transmit data...
   
   // Reads however many bytes are currently available
   communication_length_in = read(motor->fd, communication_buffer_in, IQ_BUFLEN);
@@ -95,7 +106,7 @@ double iqReadAngle( void ) {
   return angle;
 }
 
-void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
+EXTERNC void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   uint8_t communication_buffer_out[IQ_BUFLEN];
@@ -119,10 +130,10 @@ void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
   }
 }
 
-void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) {
+EXTERNC void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) {
   double cur_angle;
 
-  cur_angle = iqReadAngle( motor );
-  iqSetAngle( motor, cur_angle + target_angle_delta, travel_time_ms );
+  cur_angle = iqReadAngle();
+  iqSetAngle(cur_angle + target_angle_delta, travel_time_ms );
 }
 

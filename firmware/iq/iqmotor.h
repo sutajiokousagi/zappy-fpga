@@ -1,7 +1,13 @@
 #include <time.h>
 
-#include "iq-module-communication-cpp/inc/generic_interface.hpp"
-#include "iq-module-communication-cpp/inc/multi_turn_angle_control_client.hpp"
+#include "generic_interface.hpp"
+#include "multi_turn_angle_control_client.hpp"
+
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
 
 // Simplified functions for talking to IQ devices over COM ports
 // Best for Linux users. Might even work for iOS. Probably doesn't work for windows.
@@ -23,28 +29,28 @@ typedef struct iqMotor {
 // Returns: iqMotor control object
 //
 // Side effects: sets terminal options on the COM port for motor control
-struct iqMotor *iqCreateMotor( const char *path );
+EXTERNC void iqCreateMotor( void );
 
 // Set a motor to "coast" mode, so it's not driving a fixed position
 // Arguments: motor object
-int iqSetCoast( struct iqMotor *motor );
+EXTERNC int iqSetCoast( void );
 
 // read the angle of a motor
 // Arguments: motor_obj (already initialized with prior call to createIqMotor)
 // Returns: current angle of motor, in radians
-double iqReadAngle( struct iqMotor *motor );
+EXTERNC double iqReadAngle( void );
 
 // set the angle of a motor
 // Arguments: motor object
 // target_angle: double that sets the target angle of the motor in radians
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
-void iqSetAngle( struct iqMotor *motor, double target_angle, unsigned long travel_time_ms );
+EXTERNC void iqSetAngle( double target_angle, unsigned long travel_time_ms );
 
 // set delta angle based on current angle
 // Arguments: motor object
 // target_angle: double that specifies the desired angular offset from whatever the current angle is
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
-void iqSetAngleDelta( struct iqMotor *motor, double target_angle_delta, unsigned long travel_time_ms );
+EXTERNC void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms );
 
 #define IQ_BUFLEN 1024   // length of IQ message buffer
 

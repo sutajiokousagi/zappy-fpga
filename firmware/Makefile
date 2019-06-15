@@ -91,7 +91,10 @@ firmware.elf: $(OBJECTS) uip/libuip.a libnet/libnet.a $(GFXDEPLIBS)
                 $(UGFXLIBS) \
 		$(UIPFLAGS) \
 	 	$(IQFLAGS) \
+		-L. -lgcc \
 		--gc-sections
+
+# -L. -lgcc  bestows upon us floating point routines :P
 
 ifneq ($(OS),Windows_NT)
 	chmod -x $@
