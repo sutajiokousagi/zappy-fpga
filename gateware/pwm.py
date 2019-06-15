@@ -8,12 +8,13 @@ class PWM(Module, AutoCSR):
         self._enable = CSRStorage()
         self._width = CSRStorage(32)
         self._period = CSRStorage(32)
+        self.hardware_ena = Signal()
 
         # # #
 
         cnt = Signal(32)
 
-        enable = self._enable.storage
+        enable = self._enable.storage | self.hardware_ena
         width = self._width.storage
         period = self._period.storage
 

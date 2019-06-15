@@ -43,6 +43,7 @@ from gateware.dac8560 import Dac8560_csr
 from gateware.pwm import PWM
 from gateware.zappy_i2c import ZappyI2C
 from gateware.oled import OLED
+from gateware.zappio import Zappio
 
 _io = [
     # ADCs
@@ -86,31 +87,28 @@ _io = [
     ("prox_int", 0, Pins("B3"), IOStandard("LVCMOS33")),
 
     # driver GPIOs
-    ("driver", 0,
+    ("zappio", 0,
+        # tested that both styles of string syntax (list or space seperated string) is valid and identical in implementation
+        Subsignal("noplate", Pins("H12 L14 M14 D4"), IOStandard("LVCMOS33")),
         Subsignal("col", Pins("K11", "B2", "E4", "B1", "C5", "D3", "A4", "D2", "B5", "E2", "B6", "J11"), IOStandard("LVCMOS33")),
         Subsignal("row", Pins("A3", "K12", "A2", "L13"), IOStandard("LVCMOS33")),
+        Subsignal("hv_engage", Pins("F3"), IOStandard("LVCMOS33"), Misc("DRIVE=12")),
+        Subsignal("cap", Pins("L12"), IOStandard("LVCMOS33")), # drv_cap on schematics
+        Subsignal("discharge", Pins("A5"), IOStandard("LVCMOS33")),  # drv_rdis on schematics
+        Subsignal("mb_unplugged", Pins("P10"), IOStandard("LVCMOS33")),
+        Subsignal("mk_unplugged", Pins("P3"), IOStandard("LVCMOS33")),
+        Subsignal("l25_pos", Pins("M12"), IOStandard("LVCMOS33")),  # l25_open_dark_lv
+        Subsignal("l25_open", Pins("M11"), IOStandard("LVCMOS33")), # l25_pos_dark_lv
     ),
-    ("drv_cap", 0, Pins("L12"), IOStandard("LVCMOS33")),
-    ("drv_rdis", 0, Pins("A5"), IOStandard("LVCMOS33")),
 
     # other GPIOs
     ("blinkenlight", 0, Pins("M13", "N14"), IOStandard("LVCMOS33"), Misc("DRIVE=12")), # higher drive because of LEDs
     ("blinkenlight", 2, Pins("J1"), IOStandard("LVCMOS33"), Misc("DRIVE=12")),
 
-    ("noplate", 0, Pins("H12"), IOStandard("LVCMOS33")),
-    ("noplate", 1, Pins("L14"), IOStandard("LVCMOS33")),
-    ("noplate", 2, Pins("M14"), IOStandard("LVCMOS33")),
-    ("noplate", 3, Pins("D4"), IOStandard("LVCMOS33")),
-
     ("fan_pwm", 0, Pins("E12"), IOStandard("LVCMOS33")),
     ("fan_tach", 0, Pins("D13"), IOStandard("LVCMOS33")),
-    ("hv_engage", 0, Pins("F3"), IOStandard("LVCMOS33"), Misc("DRIVE=12")),
-    ("l25_open_dark_lv", 0, Pins("M12"), IOStandard("LVCMOS33")),
-    ("l25_pos_dark_lv", 0, Pins("M11"), IOStandard("LVCMOS33")),
     ("mcu_int0", 0, Pins("D1"), IOStandard("LVCMOS33")),
     ("mcu_int1", 0, Pins("C1"), IOStandard("LVCMOS33")),
-    ("mb_unplugged", 0, Pins("P10"), IOStandard("LVCMOS33")),
-    ("mk_unplugged", 0, Pins("P3"), IOStandard("LVCMOS33")),
     ("buzzer_drv", 0, Pins("F4"), IOStandard("LVCMOS33")),
 
     # SPI to display
@@ -512,6 +510,16 @@ class ZappySoC(SoCCore):
         self.add_csr("motor", allow_user_defined=True)
         self.add_interrupt("motor", allow_user_defined=True)
 
+        # voltage and current monitors (MK-HV power-supply reported)
+        self.submodules.vmon = Adc121s101_csr(platform.request("vmon", 0))
+        self.add_csr("vmon")
+        self.submodules.imon = Adc121s101_csr(platform.request("imon", 0))
+        self.add_csr("imon")
+
+        # hook up the direct GPIOs to the CSR space in a tasteful manner
+        self.submodules.zappio = Zappio(platform.request("zappio", 0), platform.request("hvdac", 0))
+        self.add_csr("zappio")
+
         # add zap monitoring interface
         memdepth = 16384
         self.submodules.monitor = Zappy_adc(platform.request("adc", 0), platform.request("fadc", 0), memdepth=memdepth)
@@ -520,21 +528,8 @@ class ZappySoC(SoCCore):
         self.add_memory_region("monitor", self.mem_map["monitor"] | self.shadow_base, memdepth * 4) # because dw = 32
         self.add_interrupt("monitor")
 
-        # these are primarily for testing at the moment
-        self.submodules.hvdac = ClockDomainsRenamer({"dac":"adc"})( Dac8560_csr(platform.request("hvdac", 0)) )
-        self.add_csr("hvdac")
-        self.submodules.vmon = Adc121s101_csr(platform.request("vmon", 0))
-        self.add_csr("vmon")
-        self.submodules.imon = Adc121s101_csr(platform.request("imon", 0))
-        self.add_csr("imon")
-        self.submodules.hvengage = led.ClassicLed(platform.request("hv_engage", 0))
-        self.add_csr("hvengage")
-
-#        memdepth = 16384  # 8 RAMB36 per 8192 depth
-#        self.submodules.memtest = Zappy_memtest(memdepth=memdepth)
-#        self.add_csr("memtest")
-#        self.add_wb_slave(mem_decoder(self.mem_map["memtest"]), self.memtest.bus)
-#        self.add_memory_region("memtest", self.mem_map["memtest"] | self.shadow_base, memdepth * 4) # because dw = 32 here
+        self.comb += self.zappio.trigger.eq(self.monitor.ext_trigger) # wire up the hardware trigger based on the presampler timeout
+        self.comb += self.buzzpwm.hardware_ena.eq(self.zappio.hv_engage_gpio) # wire up buzzer to beep whenever HV is engaged
 
         from litescope import LiteScopeAnalyzer
 
@@ -552,12 +547,6 @@ class ZappySoC(SoCCore):
         self.analyzer.export_csv(vns, "test/analyzer.csv")
 
 """
-        # SPI for flash already added above
-        # SPI for ADC
-        self.submodules.spi = SPIMaster(platform.request("spi"))
-        # SPI for DAC
-        self.submodules.spi_dac = SPIMaster(platform.request("spi_dac"))
-
         # GPIO
         self.submodules.gi = GPIOIn(platform.request("gpio_in", 0).gi)
         self.submodules.go = GPIOOut(platform.request("gpio_out", 0).go)
