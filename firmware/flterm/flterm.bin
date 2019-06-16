@@ -1,0 +1,1 @@
+./flterm --port /dev/ttyS0 --speed 115200 --kernel ../firmware.bin
