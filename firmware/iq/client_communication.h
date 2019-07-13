@@ -32,22 +32,6 @@
 
 enum Access {kGet=0, kSet=1, kSave=2, kReply=3};
 
-class ClientEntryAbstract {
-  public:
-    ClientEntryAbstract(uint8_t type_idn, uint8_t obj_idn, uint8_t sub_idn):
-      type_idn_(type_idn),
-      obj_idn_(obj_idn),
-      sub_idn_(sub_idn) {};
-
-    virtual ~ClientEntryAbstract(){};
-
-    virtual void Reply(const uint8_t* data, uint8_t len) = 0;
-
-    const uint8_t type_idn_;
-    const uint8_t obj_idn_;
-    const uint8_t sub_idn_;
-};
-
 class ClientEntryVoid: public ClientEntryAbstract {
   public:
     ClientEntryVoid(uint8_t type_idn, uint8_t obj_idn, uint8_t sub_idn):
@@ -139,24 +123,38 @@ class ClientEntry: public ClientEntryAbstract {
     T value_;
 };
 
-class ClientAbstract{
-  public:
-    ClientAbstract(uint8_t type_idn, uint8_t obj_idn):
-      type_idn_(type_idn),
-      obj_idn_(obj_idn) {};
-
-    virtual ~ClientAbstract(){};
-
-    virtual void ReadMsg(uint8_t* rx_data, uint8_t rx_length) = 0;
-
-    const uint8_t type_idn_;
-    const uint8_t obj_idn_;
-};
-
 int8_t ParseMsg(uint8_t* rx_data, uint8_t rx_length,
   ClientEntryAbstract** entry_array, uint8_t entry_length);
 
 int8_t ParseMsg(uint8_t* rx_data, uint8_t rx_length,
   ClientEntryAbstract& entry);
+
+/*
+  MultiTurnAngleClient consists of:
+   - a series of commands, indexed 0-25 in an array with symbolic names
+   - each command has a "value" associated with it that has a length, which could be 0, and a datatype, which is void, uint8_t, or float.
+   - each command has a "is_fresh_" parameter associated with it
+   - each command should respond to init, get, set, save, Reply, get_reply, isFresh methods
+   - the trick in going from C++ -> C is the dynamic type dispatch
+
+   type_idn is fixed: kTypeAngleMotorControl (changes based only on API type)
+   obj_idn is tracked by the user code, as a passed parameter. obj_idn should be a pointer to a struct with all the data we need on otherwise
+     generic functions
+   sub_idn codes -- we can make an Enum list that encapsulates all the sub_idn_ codes.
+     * This enum list should go into a lookup table that defines the dispatch type for the function
+     * A function pointer should be assigned to the array entry according to the dispatch type.
+ */
+
+// we need float, void, and uint8_t variants
+typedef struct Client_storage {
+  uint8_t type_idn_;
+  uint8_t obj_idn_;
+  uint8_t sub_idn_;
+  union {
+    uint8_t value_uint8_t;
+    float value_float_t;
+  }
+  
+} Client_storage;
 
 #endif // CLIENT_COMMUNICATION_H

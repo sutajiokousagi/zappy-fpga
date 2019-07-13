@@ -1,7 +1,7 @@
 #include <time.h>
 
-#include "generic_interface.hpp"
-#include "multi_turn_angle_control_client.hpp"
+#include "generic_interface.h"
+#include "multi_turn_angle_control_client.h"
 
 #ifdef __cplusplus
 #define EXTERNC extern "C"
@@ -16,9 +16,9 @@ extern struct timespec ts_ref;
 
 typedef struct iqMotor {
   char *com_path;
-  int fd;
-  GenericInterface *iq_com;
-  MultiTurnAngleControlClient *mta_client;  
+  struct CommInterface_storage *iq_com;
+  struct mta_object *mta;
+  int fd; // dummy to be killed soon!
 } iqMotor;
 
 // Create IqMotor object and bind a COM port path to it
@@ -29,28 +29,28 @@ typedef struct iqMotor {
 // Returns: iqMotor control object
 //
 // Side effects: sets terminal options on the COM port for motor control
-EXTERNC void iqCreateMotor( void );
+ void iqCreateMotor( void );
 
 // Set a motor to "coast" mode, so it's not driving a fixed position
 // Arguments: motor object
-EXTERNC int iqSetCoast( void );
+ int iqSetCoast( void );
 
 // read the angle of a motor
 // Arguments: motor_obj (already initialized with prior call to createIqMotor)
 // Returns: current angle of motor, in radians
-EXTERNC double iqReadAngle( void );
+ double iqReadAngle( void );
 
 // set the angle of a motor
 // Arguments: motor object
 // target_angle: double that sets the target angle of the motor in radians
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
-EXTERNC void iqSetAngle( double target_angle, unsigned long travel_time_ms );
+ void iqSetAngle( double target_angle, unsigned long travel_time_ms );
 
 // set delta angle based on current angle
 // Arguments: motor object
 // target_angle: double that specifies the desired angular offset from whatever the current angle is
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
-EXTERNC void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms );
+ void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms );
 
 #define IQ_BUFLEN 1024   // length of IQ message buffer
 

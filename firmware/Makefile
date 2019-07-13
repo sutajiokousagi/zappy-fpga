@@ -31,7 +31,7 @@ USE_UIP:=yes
 USE_GFX:=yes
 
 # use IQ motor
-USE_IQ:=no
+USE_IQ:=yes
 
 ifeq (yes,$(USE_GFX))
 	GFXDIR := /home/bunnie/code/zappy-fpga/third_party/ugfx

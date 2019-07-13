@@ -21,34 +21,38 @@
 //#include <linux/limits.h>
 
 #include "iqmotor.h"
-#include "motor.h"
 
 static struct iqMotor motor_storage;
 static struct iqMotor *motor;
+static struct CommInterface_storage iq_com;
+static struct mta_object iq_mta;
 
 size_t write(int fd, const void *buf, size_t count);
 size_t read(int fd, const void *buf, size_t count);
 
-EXTERNC void iqCreateMotor(void) {
+void iqCreateMotor(void) {
   motor = &motor_storage;
+  motor->iq_com = &iq_com;
+
+  CommInterface_init(motor->iq_com);
   
-  motor->iq_com = new GenericInterface();
-  motor->mta_client = new MultiTurnAngleControlClient(0);
+  motor->mta = &iq_mta;
+  mta_init(motor->mta, motor->iq_com, 0);
 
   motor->fd = 0;
 }
 
 
-EXTERNC int iqSetCoast( void ) {
+ int iqSetCoast( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   // Stores length of message to send or receive
   uint8_t communication_length_in;
 
-  motor->mta_client->ctrl_coast_.set(*(motor->iq_com)); // put the input controller in "coast" mode
+  mta_set(motor->mta, kSubCtrlCoast);  //  motor->mta_client->ctrl_coast_.set(*(motor->iq_com)); // put the input controller in "coast" mode
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
-  if(motor->iq_com->GetTxBytes(communication_buffer_in, communication_length_in)) {
+  if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
     write(motor->fd, communication_buffer_in, communication_length_in);
     return 0;
   } else {
@@ -57,7 +61,7 @@ EXTERNC int iqSetCoast( void ) {
 }
 
 
-EXTERNC double iqReadAngle( void ) {
+ double iqReadAngle( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   uint8_t communication_buffer_out[IQ_BUFLEN];
@@ -69,11 +73,11 @@ EXTERNC double iqReadAngle( void ) {
 
   ///////////// READ THE INPUT CONTROLLER
   // Generate the set messages
-  motor->mta_client->obs_angular_displacement_.get(*(motor->iq_com)); // get the angular displacement
+  mta_get(motor->mta, kSubObsAngularDisplacement); //  motor->mta_client->obs_angular_displacement_.get(*(motor->iq_com)); // get the angular displacement
 
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
-  if(motor->iq_com->GetTxBytes(communication_buffer_in, communication_length_in)) {
+  if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
     write(motor->fd, communication_buffer_in, communication_length_in);
   } else {
     return -1; // should be NAN...
@@ -85,28 +89,29 @@ EXTERNC double iqReadAngle( void ) {
   communication_length_in = read(motor->fd, communication_buffer_in, IQ_BUFLEN);
   
   // Puts the recently read bytes into com's receive queue
-  motor->iq_com->SetRxBytes(communication_buffer_in, communication_length_in);
+  CommInterface_SetRxBytes(motor->iq_com, communication_buffer_in, communication_length_in);
   
   uint8_t *rx_data; // temporary pointer to received type+data bytes
   uint8_t rx_length; // number of received type+data bytes
   // while we have message packets to parse
-  while(motor->iq_com->PeekPacket(&rx_data, &rx_length)) {
+  while(CommInterface_PeekPacket(motor->iq_com, &rx_data, &rx_length)) {
     // Share that packet with all client objects
     //    motor->mta_client->ReadMsg(*(motor->iq_com), rx_data, rx_length);
-    motor->mta_client->ReadMsg(rx_data, rx_length);
+    CommInterface_ReadMsg(motor->iq_com, rx_data, rx_length);
     
     // Once we're done with the message packet, drop it
-    motor->iq_com->DropPacket();
+    CommInterface_DropPacket(motor->iq_com);
   }
 
   //  if( motor->mta_client->obs_angular_displacement_.IsFresh() ) {
-    angle = motor->mta_client->obs_angular_displacement_.get_reply();
+  mta_get_reply(motor->mta);
+  angle = motor->mta->data.data.f; // we could dispatch on type, but in this case, we "just know"
   //  }
     
   return angle;
 }
 
-EXTERNC void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
+ void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   uint8_t communication_buffer_out[IQ_BUFLEN];
@@ -115,22 +120,27 @@ EXTERNC void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
   uint8_t communication_length_out;
 
   /////////////// WRITE OUTPUT CONTROLLER
-  motor->mta_client->ctrl_mode_.set(*(motor->iq_com), 6); // put the input controller in "coast" mode
+  motor->mta->data.data.c = 6;
+  mta_set(motor->mta, kSubCtrlMode);
+  // motor->mta_client->ctrl_mode_.set(*(motor->iq_com), 6); // put the input controller in "coast" mode
   
   // Generate the set messages
-  motor->mta_client->trajectory_angular_displacement_.set(*(motor->iq_com), (float) target_angle);
-  motor->mta_client->trajectory_duration_.set(*(motor->iq_com), (float) travel_time_ms / 1000.0 ); 
+  motor->mta->data.data.f = (float) target_angle;
+  mta_set(motor->mta, kSubTrajectoryAngularDisplacement); //  motor->mta_client->trajectory_angular_displacement_.set(*(motor->iq_com), (float) target_angle);
+  motor->mta->data.data.f = (float) travel_time_ms / 1000.0;
+  mta_set(motor->mta, kSubTrajectoryDuration); //  motor->mta_client->trajectory_duration_.set(*(motor->iq_com), (float) travel_time_ms / 1000.0 ); 
 
-  motor->mta_client->obs_angular_displacement_.get(*(motor->iq_com));
+  mta_get(motor->mta, kSubObsAngularDisplacement);
+  // motor->mta_client->obs_angular_displacement_.get(*(motor->iq_com));
   
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
-  if(motor->iq_com->GetTxBytes(communication_buffer_out, communication_length_out)) {
+  if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_out, &communication_length_out)) {
     write(motor->fd, communication_buffer_out, communication_length_out);
   }
 }
 
-EXTERNC void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) {
+void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) {
   double cur_angle;
 
   cur_angle = iqReadAngle();
