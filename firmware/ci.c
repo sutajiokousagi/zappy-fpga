@@ -425,7 +425,7 @@ void ci_service(void)
 	  } else {
 	    help_debug();
 	  }
-#ifdef MOTOR	  
+#ifdef MOTOR
 	} else if(strcmp(token, "motor") == 0 ) {
 	  token = get_token(&str);
 	  do_motor(token);

@@ -14,6 +14,9 @@
 
 void processor_init(void) {
   i2c_init();
+#ifdef MOTOR
+  motor_comm_init();
+#endif
 }
 
 void processor_start(void) {

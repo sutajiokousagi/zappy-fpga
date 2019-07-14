@@ -28,6 +28,7 @@
 #include "crc_helper.h"
 #include "string.h" // for memcpy
 #include "bipbuffer.h"
+#include "multi_turn_angle_control_client.h"
 
 struct BipBuffer tx_bipbuf;
 
@@ -123,14 +124,14 @@ int8_t CommInterface_GetTxBytes(struct CommInterface_storage *self, uint8_t* dat
   uint16_t length_temp;
   uint8_t* location_temp;
   
-  location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, length_temp);
+  location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, &length_temp);
   if(length_temp)
   {
     memcpy(data_out, location_temp, length_temp);
     *length_out = length_temp;
     self->tx_bipbuf.DecommitBlock(&self->tx_bipbuf, length_temp);
     
-    location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, length_temp);
+    location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, &length_temp);
     memcpy(&data_out[*length_out], location_temp, length_temp);
     *length_out = *length_out + length_temp;
     self->tx_bipbuf.DecommitBlock(&self->tx_bipbuf, length_temp);
@@ -144,10 +145,7 @@ void CommInterface_SendNow(struct CommInterface_storage *self)
   // I'm useless.
 }
 
-void CommInterface_ReadMsg(struct CommInterface_storage *com, uint8_t* data, uint8_t length)
+void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length)
 {
-  // I currently don't support being talked to
-  (void)com;
-  (void)data;
-  (void)length;
+  ParseMsg(mta, data, length);
 }

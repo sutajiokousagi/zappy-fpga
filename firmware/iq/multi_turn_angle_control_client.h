@@ -1,6 +1,9 @@
+#ifndef MTA_H
+#define MTA_H
+
 #include <stdbool.h>
 
-const uint8_t kTypeAngleMotorControl = 59;
+#define kTypeAngleMotorControl 59
 
 enum Access {kGet=0, kSet=1, kSave=2, kReply=3};
 
@@ -66,3 +69,4 @@ bool mta_IsFresh(struct mta_object *mta);
 
 #define kEntryLength  (kSubTrajectoryLinearAcceleration+1)
 
+#endif

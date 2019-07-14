@@ -84,5 +84,5 @@ void CommInterface_SendNow(struct CommInterface_storage *self);
      ******************************************************************************/
      
     /// Read a given message and act appropriately.
-void CommInterface_ReadMsg(struct CommInterface_storage *com, uint8_t* data, uint8_t length);
+void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length);
 #endif // COMMUNICATION_INTERFACE_H

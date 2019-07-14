@@ -12,5 +12,8 @@ void isr(void)
 	if(irqs & (1 << UART_INTERRUPT)) {
 		uart_isr();
 	}
+	if(irqs & (1 << MOTOR_INTERRUPT)) {
+	  motor_isr();
+	}
 
 }

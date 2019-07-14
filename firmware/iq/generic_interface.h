@@ -30,6 +30,7 @@
 #include "packet_finder.h"
 #include "byte_queue.h"
 #include "bipbuffer.h"
+#include "multi_turn_angle_control_client.h"
 
 #define GENERIC_PF_INDEX_DATA_SIZE 20   // size of index buffer in packet_finder
 
@@ -56,5 +57,6 @@ typedef struct CommInterface_storage {
 int8_t CommInterface_SetRxBytes(struct CommInterface_storage *self, uint8_t* data_in, uint16_t length_in);
 int8_t CommInterface_GetTxBytes(struct CommInterface_storage *self, uint8_t* data_out, uint8_t *length_out);
 void CommInterface_init(struct CommInterface_storage *iq_com);
+int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length);
     
 #endif // GENERIC_INTERFACE_H

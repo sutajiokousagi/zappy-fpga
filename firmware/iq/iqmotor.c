@@ -21,14 +21,15 @@
 //#include <linux/limits.h>
 
 #include "iqmotor.h"
+#include "../motor.h"
 
 static struct iqMotor motor_storage;
 static struct iqMotor *motor;
 static struct CommInterface_storage iq_com;
 static struct mta_object iq_mta;
 
-size_t write(int fd, const void *buf, size_t count);
-size_t read(int fd, const void *buf, size_t count);
+size_t write(const void *buf, size_t count);
+size_t read(const void *buf, size_t count);
 
 void iqCreateMotor(void) {
   motor = &motor_storage;
@@ -38,8 +39,6 @@ void iqCreateMotor(void) {
   
   motor->mta = &iq_mta;
   mta_init(motor->mta, motor->iq_com, 0);
-
-  motor->fd = 0;
 }
 
 
@@ -53,7 +52,7 @@ void iqCreateMotor(void) {
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
   if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
-    write(motor->fd, communication_buffer_in, communication_length_in);
+    write(communication_buffer_in, communication_length_in);
     return 0;
   } else {
     return 1;
@@ -78,7 +77,7 @@ void iqCreateMotor(void) {
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
   if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
-    write(motor->fd, communication_buffer_in, communication_length_in);
+    write(communication_buffer_in, communication_length_in);
   } else {
     return -1; // should be NAN...
   }
@@ -86,7 +85,7 @@ void iqCreateMotor(void) {
   delay(1); // delay 1ms for serial data to transmit data...
   
   // Reads however many bytes are currently available
-  communication_length_in = read(motor->fd, communication_buffer_in, IQ_BUFLEN);
+  communication_length_in = read(communication_buffer_in, IQ_BUFLEN);
   
   // Puts the recently read bytes into com's receive queue
   CommInterface_SetRxBytes(motor->iq_com, communication_buffer_in, communication_length_in);
@@ -97,7 +96,7 @@ void iqCreateMotor(void) {
   while(CommInterface_PeekPacket(motor->iq_com, &rx_data, &rx_length)) {
     // Share that packet with all client objects
     //    motor->mta_client->ReadMsg(*(motor->iq_com), rx_data, rx_length);
-    CommInterface_ReadMsg(motor->iq_com, rx_data, rx_length);
+    CommInterface_ReadMsg(motor->mta, rx_data, rx_length);
     
     // Once we're done with the message packet, drop it
     CommInterface_DropPacket(motor->iq_com);
@@ -136,7 +135,7 @@ void iqCreateMotor(void) {
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
   if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_out, &communication_length_out)) {
-    write(motor->fd, communication_buffer_out, communication_length_out);
+    write(communication_buffer_out, communication_length_out);
   }
 }
 
@@ -145,5 +144,27 @@ void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) 
 
   cur_angle = iqReadAngle();
   iqSetAngle(cur_angle + target_angle_delta, travel_time_ms );
+}
+
+size_t write(const void *buf, size_t count) {
+  int i = 0;
+  char *wbuf = (char *) buf;
+  for( i = 0; i < count; i++ ) {
+    motor_write(wbuf[i]);
+  }
+
+  motor_sync();
+  return count;
+}
+
+size_t read(const void *buf, size_t count) {
+  int i = 0;
+  char *rbuf = (char *)buf;
+
+  // TODO: add timeout mechanism
+  for( i = 0; i < count; i++ ) {
+    rbuf[i] = motor_read();
+  }
+  return count;
 }
 

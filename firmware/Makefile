@@ -54,7 +54,7 @@ ifeq (yes,$(USE_IQ))
 	IQFLAGS := -L./iq -liq
 	IQDIR := /home/bunnie/code/zappy-fpga/iq
 
-	OBJECTS += motor.o
+	OBJECTS += motor.o motor_uart.o
 	CFLAGS += -DMOTOR -I$(IQDIR) -Iiq
 endif
 
