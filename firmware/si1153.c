@@ -12,6 +12,7 @@
 
 #include "i2c.h"
 #include "si1153.h"
+#include "delay.h"
 
 
 /**************************************************************************//**
@@ -107,17 +108,6 @@ int16_t Si115xBlockRead(HANDLE si115x_handle, uint8_t address, uint8_t length, u
   return((int) 0);
 }
 
-
-/**************************************************************************//**
- * @brief Hardware implemented delay function. Does not need to be accurate.
- *****************************************************************************/
-void delay_ms(int ms) {
-  int timer;
-
-  elapsed(&timer, -1); // initialize the timer
-  while( !elapsed(&timer, (SYSTEM_CLOCK_FREQUENCY / 1000) * ms) )
-    ;
-}
 
 /**************************************************************************//**
  * @brief 10ms delay required by Si115x reset sequence.

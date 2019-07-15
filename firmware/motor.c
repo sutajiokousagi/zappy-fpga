@@ -14,22 +14,10 @@
 
 #include "iqmotor.h"
 #include "motor.h"
+#include "delay.h"
 
 void motor_init(void) {
   iqCreateMotor();
-}
-
-void delay(int ms) {
-  int loops, i;
-  int remainder;
-
-  loops = ms / 500;
-  remainder = ms % 500;
-
-  for( i = 0; i < loops; i++ ) {
-    delay_ms(500);
-  }
-  delay_ms(remainder);
 }
 
 /*

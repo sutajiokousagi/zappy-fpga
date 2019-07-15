@@ -24,9 +24,14 @@
   Contributors: Raphael Van Hoffelen
 */
 
+#include <stdio.h>
 #include <stdint.h>
+#include "crc_helper.h"
+#include "string.h" // for memcpy
+#include "bipbuffer.h"
+
 #include "multi_turn_angle_control_client.h"
-#include "generic_interface.h"
+#include "communication_interface.h"
 
 extern mta_storage entry_array[];
 
@@ -57,3 +62,139 @@ int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
   return 0; // I didn't parse anything
 }
 
+void CommInterface_init(struct CommInterface_storage *self)
+{
+  //printf( "initbq\n" );
+  InitBQ(&self->index_queue, self->pf_index_data, GENERIC_PF_INDEX_DATA_SIZE);
+  //printf( "initpkt\n" );
+  InitPacketFinder(&self->pf, &self->index_queue);
+  //printf( "bipbufferinit\n" );
+  BipBuffer_init(&self->tx_bipbuf, self->tx_buffer, GENERIC_TX_BUFFER_SIZE); 
+}
+
+int8_t CommInterface_GetBytes(struct CommInterface_storage *self)
+{
+  // I can't do anything on my own since I don't have hardware
+  // Use SetRxBytes(uint8_t* data_in, uint16_t length_in)
+  return 0;
+}
+
+int8_t CommInterface_SetRxBytes(struct CommInterface_storage *self, uint8_t* data_in, uint16_t length_in)
+{
+  if(data_in == NULL)
+    return -1;
+  
+  if(length_in)
+  {
+    //copy it over
+    PutBytes(&self->pf, data_in, length_in); 
+    return 1;
+  }
+  else
+    return 0;
+}
+
+int8_t CommInterface_PeekPacket(struct CommInterface_storage *self, uint8_t **packet, uint8_t *length)
+{
+  return(PeekPacket(&self->pf, packet, length));
+}
+
+int8_t CommInterface_DropPacket(struct CommInterface_storage *self)
+{
+  return(DropPacket(&self->pf));
+}
+
+int8_t CommInterface_SendPacket(struct CommInterface_storage *self, uint8_t msg_type, uint8_t *data, uint16_t length)
+{
+  // This function must not be interrupted by another call to SendBytes or 
+  // SendPacket, or else the packet it builds will be spliced/corrupted.
+
+  uint8_t header[3];
+  header[0] = kStartByte;                   // const defined by packet_finder.c
+  header[1] = length;
+  header[2] = msg_type;
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
+  CommInterface_SendBytes(self, header, 3);
+  
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
+  CommInterface_SendBytes(self, data, length);
+  
+  uint8_t footer[2];
+  uint16_t crc;
+  //printf("SendPacket makecrc\n");
+  //delay_ms(10);
+  crc = MakeCrc(&(header[1]), 2);
+  //printf("SendPacket updatecrc\n");
+  //delay_ms(10);
+  crc = ArrayUpdateCrc(crc, data, length);
+  footer[0] = crc & 0x00FF;
+  footer[1] = crc >> 8;
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
+  CommInterface_SendBytes(self, footer, 2);
+  
+  return(1);
+}
+
+int8_t CommInterface_SendBytes(struct CommInterface_storage *self, uint8_t *bytes, uint16_t length)
+{
+  uint16_t length_temp = 0;
+  uint8_t* location_temp;
+  int8_t ret = 0;
+    
+  //printf("SendBytes Reserv\n");
+  //delay_ms(10);
+  // Reserve space in the buffer
+  location_temp = self->tx_bipbuf.Reserve(&self->tx_bipbuf, length, &length_temp);
+  
+  // If there's room, do the copy
+  if(length == length_temp)
+  {
+    //printf("SendBytes committing\n");
+    //delay_ms(10);
+    memcpy(location_temp, bytes, length_temp);   // do copy
+    self->tx_bipbuf.Commit(&self->tx_bipbuf, length_temp);
+    ret = 1;
+  }
+  else
+  {
+    //printf("SendBytes canceling\n");
+    //delay_ms(10);
+    self->tx_bipbuf.Commit(&self->tx_bipbuf, 0); // Call the restaurant, cancel the reservations
+  }
+    
+  return ret;
+}
+
+int8_t CommInterface_GetTxBytes(struct CommInterface_storage *self, uint8_t* data_out, uint8_t *length_out)
+{
+  uint16_t length_temp;
+  uint8_t* location_temp;
+  
+  location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, &length_temp);
+  if(length_temp)
+  {
+    memcpy(data_out, location_temp, length_temp);
+    *length_out = length_temp;
+    self->tx_bipbuf.DecommitBlock(&self->tx_bipbuf, length_temp);
+    
+    location_temp = self->tx_bipbuf.GetContiguousBlock(&self->tx_bipbuf, &length_temp);
+    memcpy(&data_out[*length_out], location_temp, length_temp);
+    *length_out = *length_out + length_temp;
+    self->tx_bipbuf.DecommitBlock(&self->tx_bipbuf, length_temp);
+    return 1;
+  }
+  return 0;
+}
+
+void CommInterface_SendNow(struct CommInterface_storage *self)
+{
+  // I'm useless.
+}
+
+void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length)
+{
+  ParseMsg(mta, data, length);
+}

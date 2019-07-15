@@ -27,8 +27,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
-#include "generic_interface.h"
+#include "communication_interface.h"
 #include "multi_turn_angle_control_client.h"
+#include "../delay.h"
 
 // mta storage array allocation
 mta_storage entry_array[kEntryLength] = {

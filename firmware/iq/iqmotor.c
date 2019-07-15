@@ -22,6 +22,7 @@
 
 #include "iqmotor.h"
 #include "../motor.h"
+#include "../delay.h"
 
 static struct iqMotor motor_storage;
 static struct iqMotor *motor;
@@ -73,10 +74,8 @@ void iqCreateMotor(void) {
  double iqReadAngle( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
-  uint8_t communication_buffer_out[IQ_BUFLEN];
   // Stores length of message to send or receive
   uint8_t communication_length_in;
-  uint8_t communication_length_out;
 
   float angle;
 
@@ -122,10 +121,8 @@ void iqCreateMotor(void) {
 
  void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
   // This buffer is for passing around messages.
-  uint8_t communication_buffer_in[IQ_BUFLEN];
   uint8_t communication_buffer_out[IQ_BUFLEN];
   // Stores length of message to send or receive
-  uint8_t communication_length_in;
   uint8_t communication_length_out;
 
   /////////////// WRITE OUTPUT CONTROLLER

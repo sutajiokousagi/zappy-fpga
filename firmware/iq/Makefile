@@ -8,7 +8,7 @@ CFLAGS=-MD -MP -Os -march=rv32im -mabi=ilp32 -D__vexriscv__ -fomit-frame-pointer
 INCLUDES=-I/home/bunnie/code/zappy-fpga/deps/litex/litex/soc/software/include/base -I/home/bunnie/code/zappy-fpga/deps/litex/litex/soc/software/include -I/home/bunnie/code/zappy-fpga/deps/litex/litex/soc/common -I/home/bunnie/code/zappy-fpga/build/software/include -I. -I..
 AR=riscv64-unknown-elf-ar
 
-OBJS=generic_interface.o client_communication.o byte_queue.o crc_helper.o packet_finder.o iqmotor.o bipbuffer.o multi_turn_angle_control_client.o
+OBJS=client_communication.o byte_queue.o crc_helper.o packet_finder.o iqmotor.o bipbuffer.o multi_turn_angle_control_client.o
 
 default: libiq.a
 

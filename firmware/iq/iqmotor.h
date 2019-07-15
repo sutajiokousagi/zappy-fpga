@@ -1,6 +1,6 @@
 #include <time.h>
 
-#include "generic_interface.h"
+#include "communication_interface.h"
 #include "multi_turn_angle_control_client.h"
 
 #ifdef __cplusplus

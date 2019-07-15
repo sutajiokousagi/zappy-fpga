@@ -29,6 +29,27 @@
 
 #include <stdint.h>
 
+#include "packet_finder.h"
+#include "byte_queue.h"
+#include "bipbuffer.h"
+#include "multi_turn_angle_control_client.h"
+
+#define GENERIC_PF_INDEX_DATA_SIZE 20   // size of index buffer in packet_finder
+
+#ifndef GENERIC_TX_BUFFER_SIZE
+  #define GENERIC_TX_BUFFER_SIZE 64
+#endif
+
+// Member Variables
+typedef struct CommInterface_storage {
+  struct PacketFinder pf;        // packet_finder instance
+  struct ByteQueue index_queue;              // needed by pf for storing indices
+  uint8_t pf_index_data[GENERIC_PF_INDEX_DATA_SIZE]; // data for index_queue used by pf
+  struct BipBuffer tx_bipbuf;   // bipbuffer for transmissions 
+  uint8_t tx_buffer[GENERIC_TX_BUFFER_SIZE];   // raw buffer for transmissions
+} CommInterface_storage;
+
+
     /*******************************************************************************
      * Receive
      ******************************************************************************/
@@ -85,4 +106,17 @@ void CommInterface_SendNow(struct CommInterface_storage *self);
      
     /// Read a given message and act appropriately.
 void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length);
+
+
+    /// Gets all outbound bytes 
+    /// The data is copied into the user supplied data_out buffer.
+    /// The length of data transferred is copied into length_out.
+    /// Returns: 1 for data transferred
+    ///          0 for no data transferred (buffer empty)
+int8_t CommInterface_SetRxBytes(struct CommInterface_storage *self, uint8_t* data_in, uint16_t length_in);
+int8_t CommInterface_GetTxBytes(struct CommInterface_storage *self, uint8_t* data_out, uint8_t *length_out);
+void CommInterface_init(struct CommInterface_storage *iq_com);
+int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length);
+    
+
 #endif // COMMUNICATION_INTERFACE_H

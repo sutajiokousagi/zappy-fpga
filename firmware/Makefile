@@ -9,6 +9,7 @@ OBJECTS=	isr.o \
 		processor.o \
 		ci.o \
 		i2c.o \
+                delay.o \
 		main.o \
 		dump.o \
 		mdio.o \
