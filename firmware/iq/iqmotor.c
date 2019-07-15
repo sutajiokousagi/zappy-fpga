@@ -32,12 +32,18 @@ size_t write(const void *buf, size_t count);
 size_t read(const void *buf, size_t count);
 
 void iqCreateMotor(void) {
+  //printf( "reached iqcreatemotor\n" );
+  //delay_ms(10);
   motor = &motor_storage;
   motor->iq_com = &iq_com;
 
+  //printf( "calling comminterface_init\n" );
+  //delay_ms(10);
   CommInterface_init(motor->iq_com);
   
   motor->mta = &iq_mta;
+  //printf( "calling mta_init\n" );
+  //delay_ms(10);
   mta_init(motor->mta, motor->iq_com, 0);
 }
 
@@ -48,9 +54,13 @@ void iqCreateMotor(void) {
   // Stores length of message to send or receive
   uint8_t communication_length_in;
 
+  //printf("calling mta_set\n");
+  //delay_ms(10);
   mta_set(motor->mta, kSubCtrlCoast);  //  motor->mta_client->ctrl_coast_.set(*(motor->iq_com)); // put the input controller in "coast" mode
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
+  //printf("sending bytes\n");
+  //delay_ms(10);
   if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
     write(communication_buffer_in, communication_length_in);
     return 0;
@@ -149,11 +159,13 @@ void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) 
 size_t write(const void *buf, size_t count) {
   int i = 0;
   char *wbuf = (char *) buf;
+  //  printf("motor write: ");
   for( i = 0; i < count; i++ ) {
+    //printf( "%02x ", wbuf[i] );
     motor_write(wbuf[i]);
+    motor_sync(); // make sure we don't get ahead of ourselves sending data
   }
-
-  motor_sync();
+  //printf( "\n" );
   return count;
 }
 
@@ -161,10 +173,12 @@ size_t read(const void *buf, size_t count) {
   int i = 0;
   char *rbuf = (char *)buf;
 
-  // TODO: add timeout mechanism
+  printf("motor read: ");
   for( i = 0; i < count; i++ ) {
     rbuf[i] = motor_read();
+    printf( "%02x ", rbuf[i] );
   }
+  printf("\n");
   return count;
 }
 

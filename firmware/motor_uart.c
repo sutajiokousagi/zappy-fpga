@@ -81,7 +81,7 @@ void motor_write(char c)
 	}
 
 	oldmask = irq_getmask();
-	irq_setmask(oldmask & ~(1 << UART_INTERRUPT));
+	irq_setmask(oldmask & ~(1 << MOTOR_INTERRUPT));
 	if((tx_consume != tx_produce) || motor_txfull_read()) {
 		tx_buf[tx_produce] = c;
 		tx_produce = tx_produce_next;
@@ -101,7 +101,7 @@ void motor_comm_init(void)
 
 	motor_ev_pending_write(motor_ev_pending_read());
 	motor_ev_enable_write(UART_EV_TX | UART_EV_RX);
-	irq_setmask(irq_getmask() | (1 << UART_INTERRUPT));
+	irq_setmask(irq_getmask() | (1 << MOTOR_INTERRUPT));
 }
 
 void motor_sync(void)

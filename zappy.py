@@ -152,8 +152,8 @@ _io = [
     ),
 
     ("mot", 0,
-        Subsignal("rx", Pins("G14"), IOStandard("LVCMOS33")),
-        Subsignal("tx", Pins("F12"), IOStandard("LVCMOS33")),
+        Subsignal("rx", Pins("G14"), IOStandard("LVCMOS33"), Misc("DRIVE=8"), Misc("SLEW=SLOW")),
+        Subsignal("tx", Pins("F12"), IOStandard("LVCMOS33"), Misc("DRIVE=8"), Misc("SLEW=SLOW")),
     ),
 
     ("nuc", 0,

@@ -24,19 +24,21 @@
   Contributors: Raphael Van Hoffelen
 */
 
+#include <stdio.h>
 #include "generic_interface.h"
 #include "crc_helper.h"
 #include "string.h" // for memcpy
 #include "bipbuffer.h"
 #include "multi_turn_angle_control_client.h"
 
-struct BipBuffer tx_bipbuf;
-
 void CommInterface_init(struct CommInterface_storage *self)
 {
+  //printf( "initbq\n" );
   InitBQ(&self->index_queue, self->pf_index_data, GENERIC_PF_INDEX_DATA_SIZE);
+  //printf( "initpkt\n" );
   InitPacketFinder(&self->pf, &self->index_queue);
-  BipBuffer_init(&tx_bipbuf, self->tx_buffer, GENERIC_TX_BUFFER_SIZE); // if we need more than one of these, malloc the tx_bifbuf for now now static to keep it easy
+  //printf( "bipbufferinit\n" );
+  BipBuffer_init(&self->tx_bipbuf, self->tx_buffer, GENERIC_TX_BUFFER_SIZE); 
 }
 
 int8_t CommInterface_GetBytes(struct CommInterface_storage *self)
@@ -80,16 +82,26 @@ int8_t CommInterface_SendPacket(struct CommInterface_storage *self, uint8_t msg_
   header[0] = kStartByte;                   // const defined by packet_finder.c
   header[1] = length;
   header[2] = msg_type;
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
   CommInterface_SendBytes(self, header, 3);
   
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
   CommInterface_SendBytes(self, data, length);
   
   uint8_t footer[2];
   uint16_t crc;
+  //printf("SendPacket makecrc\n");
+  //delay_ms(10);
   crc = MakeCrc(&(header[1]), 2);
+  //printf("SendPacket updatecrc\n");
+  //delay_ms(10);
   crc = ArrayUpdateCrc(crc, data, length);
   footer[0] = crc & 0x00FF;
   footer[1] = crc >> 8;
+  //printf("SendPacket SendBytes\n");
+  //delay_ms(10);
   CommInterface_SendBytes(self, footer, 2);
   
   return(1);
@@ -101,18 +113,24 @@ int8_t CommInterface_SendBytes(struct CommInterface_storage *self, uint8_t *byte
   uint8_t* location_temp;
   int8_t ret = 0;
     
+  //printf("SendBytes Reserv\n");
+  //delay_ms(10);
   // Reserve space in the buffer
   location_temp = self->tx_bipbuf.Reserve(&self->tx_bipbuf, length, &length_temp);
   
   // If there's room, do the copy
   if(length == length_temp)
   {
+    //printf("SendBytes committing\n");
+    //delay_ms(10);
     memcpy(location_temp, bytes, length_temp);   // do copy
     self->tx_bipbuf.Commit(&self->tx_bipbuf, length_temp);
     ret = 1;
   }
   else
   {
+    //printf("SendBytes canceling\n");
+    //delay_ms(10);
     self->tx_bipbuf.Commit(&self->tx_bipbuf, 0); // Call the restaurant, cancel the reservations
   }
     

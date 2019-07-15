@@ -26,6 +26,7 @@
 
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 #include "generic_interface.h"
 #include "multi_turn_angle_control_client.h"
 
@@ -77,6 +78,8 @@ void mta_set(struct mta_object *mta, mta_command cmd) {
     uint8_t tx_msg[2];
     tx_msg[0] = cmd;
     tx_msg[1] = (mta->obj_idn<<2) | kSet; // high six | low two
+    printf("mta_set void callilng sendpacket\n");
+    delay_ms(10);
     CommInterface_SendPacket(mta->com, kTypeAngleMotorControl, tx_msg, 2);
   } else if( entry_array[cmd].type == mta_uint8_t ) {
     uint8_t tx_msg[2 + sizeof(uint8_t)];
@@ -91,7 +94,7 @@ void mta_set(struct mta_object *mta, mta_command cmd) {
     memcpy(&tx_msg[2], &mta->data.data.f, sizeof(float));
     CommInterface_SendPacket(mta->com, kTypeAngleMotorControl, tx_msg, 2 + sizeof(float));
   } else {
-    // this is an error condition, should probably print that
+    printf("unknown command in mta_set\n");
   }
 }
 
