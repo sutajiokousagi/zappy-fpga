@@ -5,8 +5,6 @@
 
 #define kTypeAngleMotorControl 59
 
-enum Access {kGet=0, kSet=1, kSave=2, kReply=3};
-
 typedef enum {
   mta_void = 0,
   mta_uint8_t = 1,

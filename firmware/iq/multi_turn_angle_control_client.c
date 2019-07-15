@@ -32,7 +32,7 @@
 #include "../delay.h"
 
 // mta storage array allocation
-mta_storage entry_array[kEntryLength] = {
+mta_storage entry_array_mta[kEntryLength] = {
   { false, kSubCtrlMode                       , mta_uint8_t, {.c = (uint8_t) 0} },
   { false, kSubCtrlBrake                      , mta_void, {.c = 0} },
   { false, kSubCtrlCoast                      , mta_void, {.c = 0} },
@@ -75,20 +75,18 @@ void mta_get(struct mta_object *mta, mta_command cmd) {
 
 void mta_set(struct mta_object *mta, mta_command cmd) {
 
-  if( entry_array[cmd].type == mta_void ) {
+  if( entry_array_mta[cmd].type == mta_void ) {
     uint8_t tx_msg[2];
     tx_msg[0] = cmd;
     tx_msg[1] = (mta->obj_idn<<2) | kSet; // high six | low two
-    printf("mta_set void callilng sendpacket\n");
-    delay_ms(10);
     CommInterface_SendPacket(mta->com, kTypeAngleMotorControl, tx_msg, 2);
-  } else if( entry_array[cmd].type == mta_uint8_t ) {
+  } else if( entry_array_mta[cmd].type == mta_uint8_t ) {
     uint8_t tx_msg[2 + sizeof(uint8_t)];
     tx_msg[0] = cmd;
     tx_msg[1] = (mta->obj_idn<<2) | kSet; // high six | low two
     memcpy(&tx_msg[2], &(mta->data.data.c), sizeof(uint8_t));
     CommInterface_SendPacket(mta->com, kTypeAngleMotorControl, tx_msg, 2 + sizeof(uint8_t));
-  } else if( entry_array[cmd].type == mta_float ) {
+  } else if( entry_array_mta[cmd].type == mta_float ) {
     uint8_t tx_msg[2 + sizeof(float)];
     tx_msg[0] = cmd;
     tx_msg[1] = (mta->obj_idn<<2) | kSet; // high six | low two
@@ -107,16 +105,16 @@ void mta_save(struct mta_object *mta, mta_command cmd) {
 }
 
 void mta_Reply(struct mta_object *mta, uint8_t *data, uint8_t len, mta_command cmd) {
-  if( entry_array[cmd].type == mta_void ) {
+  if( entry_array_mta[cmd].type == mta_void ) {
     if(len == 0) {
       mta->data.is_fresh = true;
     }
-  } else if( entry_array[cmd].type == mta_uint8_t ) {
+  } else if( entry_array_mta[cmd].type == mta_uint8_t ) {
     if(len == sizeof(uint8_t)) {
       memcpy(&mta->data.data.c, data, sizeof(uint8_t));
       mta->data.is_fresh = true;
     }
-  } else if( entry_array[cmd].type == mta_float ) {
+  } else if( entry_array_mta[cmd].type == mta_float ) {
     if(len == sizeof(float)) {
       memcpy(&mta->data.data.f, data, sizeof(float));
       mta->data.is_fresh = true;

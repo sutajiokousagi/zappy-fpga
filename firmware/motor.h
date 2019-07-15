@@ -5,11 +5,6 @@
 extern "C" {
 #endif
   
-void iqCreateMotor(void);
-void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms );
-double iqReadAngle( void );
-void iqSetAngle( double target_angle, unsigned long travel_time_ms );
-
 void motor_init(void);
 void motor_isr(void);
 void motor_sync(void);

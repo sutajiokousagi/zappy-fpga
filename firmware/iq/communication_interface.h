@@ -29,10 +29,13 @@
 
 #include <stdint.h>
 
+enum Access {kGet=0, kSet=1, kSave=2, kReply=3};
+
 #include "packet_finder.h"
 #include "byte_queue.h"
 #include "bipbuffer.h"
 #include "multi_turn_angle_control_client.h"
+#include "power_monitor_client.h"
 
 #define GENERIC_PF_INDEX_DATA_SIZE 20   // size of index buffer in packet_finder
 
@@ -104,8 +107,6 @@ void CommInterface_SendNow(struct CommInterface_storage *self);
      * Parsing
      ******************************************************************************/
      
-    /// Read a given message and act appropriately.
-void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length);
 
 
     /// Gets all outbound bytes 
@@ -116,7 +117,12 @@ void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length
 int8_t CommInterface_SetRxBytes(struct CommInterface_storage *self, uint8_t* data_in, uint16_t length_in);
 int8_t CommInterface_GetTxBytes(struct CommInterface_storage *self, uint8_t* data_out, uint8_t *length_out);
 void CommInterface_init(struct CommInterface_storage *iq_com);
-int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length);
-    
+
+void CommInterface_ReadMsg_Mta(struct mta_object *mta, uint8_t* data, uint8_t length);
+int8_t ParseMsg_Mta(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length);
+
+void CommInterface_ReadMsg_Pmc(struct pmc_object *mta, uint8_t* data, uint8_t length);
+int8_t ParseMsg_Pmc(struct pmc_object *mta, uint8_t* rx_data, uint8_t rx_length);
+
 
 #endif // COMMUNICATION_INTERFACE_H

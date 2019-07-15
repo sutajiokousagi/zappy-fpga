@@ -31,12 +31,13 @@
 #include "bipbuffer.h"
 
 #include "multi_turn_angle_control_client.h"
+#include "power_monitor_client.h"
 #include "communication_interface.h"
 
-extern mta_storage entry_array[];
-
+///////// EACH CLIENT GETS THIS SECTION TO HANDLE READS
+extern mta_storage entry_array_mta[];
 // lookup entry_length based on the mta->type field
-int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
+int8_t ParseMsg_Mta(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
 {
   uint8_t type_idn = rx_data[0];
   uint8_t sub_idn = rx_data[1];
@@ -50,7 +51,7 @@ int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
     if(sub_idn < kEntryLength)
       {
 	    // if the type and obj identifiers match
-	    if(entry_array[sub_idn].command == type_idn &&
+	    if(entry_array_mta[sub_idn].command == type_idn &&
 		 mta->obj_idn == obj_idn)
 		{
 		  // ... then we have a valid message
@@ -61,6 +62,43 @@ int8_t ParseMsg(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
     }
   return 0; // I didn't parse anything
 }
+void CommInterface_ReadMsg_Mta(struct mta_object *mta, uint8_t* data, uint8_t length)
+{
+  ParseMsg_Mta(mta, data, length);
+}
+
+
+extern pmc_storage entry_array_pmc[];
+int8_t ParseMsg_Pmc(struct pmc_object *pmc, uint8_t* rx_data, uint8_t rx_length)
+{
+  uint8_t type_idn = rx_data[0];
+  uint8_t sub_idn = rx_data[1];
+  uint8_t obj_idn = rx_data[2] >> 2; // high 6 bits are obj_idn
+  enum Access dir = (enum Access) (rx_data[2] & 0b00000011); // low two bits
+
+  // if we have a reply (we only parse replies here)
+  if(dir == kReply)
+  {
+    // if sub_idn is within array range (safe to access array at this location)
+    if(sub_idn < kEntryLength_pmc)
+      {
+	    // if the type and obj identifiers match
+	    if(entry_array_pmc[sub_idn].command == type_idn &&
+		 pmc->obj_idn == obj_idn)
+		{
+		  // ... then we have a valid message
+		  pmc_Reply(pmc, &rx_data[3], rx_length-3, sub_idn);
+		  return 1; // I parsed something
+		}
+	    }
+    }
+  return 0; // I didn't parse anything
+}
+void CommInterface_ReadMsg_Pmc(struct pmc_object *pmc, uint8_t* data, uint8_t length)
+{
+  ParseMsg_Pmc(pmc, data, length);
+}
+///////// END PER CLIENT SECITON
 
 void CommInterface_init(struct CommInterface_storage *self)
 {
@@ -194,7 +232,3 @@ void CommInterface_SendNow(struct CommInterface_storage *self)
   // I'm useless.
 }
 
-void CommInterface_ReadMsg(struct mta_object *mta, uint8_t* data, uint8_t length)
-{
-  ParseMsg(mta, data, length);
-}

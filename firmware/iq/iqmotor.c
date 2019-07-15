@@ -28,24 +28,31 @@ static struct iqMotor motor_storage;
 static struct iqMotor *motor;
 static struct CommInterface_storage iq_com;
 static struct mta_object iq_mta;
+static struct pmc_object iq_pmc;
+static struct CommInterface_storage iq_pmc_com;
 
 size_t write(const void *buf, size_t count);
 size_t read(const void *buf, size_t count);
 
 void iqCreateMotor(void) {
-  //printf( "reached iqcreatemotor\n" );
-  //delay_ms(10);
+  // basic storage allocation
   motor = &motor_storage;
-  motor->iq_com = &iq_com;
 
-  //printf( "calling comminterface_init\n" );
-  //delay_ms(10);
+
+  // mta init
+  motor->iq_com = &iq_com;
   CommInterface_init(motor->iq_com);
   
   motor->mta = &iq_mta;
-  //printf( "calling mta_init\n" );
-  //delay_ms(10);
   mta_init(motor->mta, motor->iq_com, 0);
+
+
+  // pmc init
+  motor->iq_pmc_com = &iq_pmc_com;
+  CommInterface_init(motor->iq_pmc_com);
+  
+  motor->pmc = &iq_pmc;
+  pmc_init(motor->pmc, motor->iq_pmc_com, 0);
 }
 
 
@@ -71,7 +78,7 @@ void iqCreateMotor(void) {
 }
 
 
- double iqReadAngle( void ) {
+ float iqReadAngle( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
   // Stores length of message to send or receive
@@ -105,7 +112,7 @@ void iqCreateMotor(void) {
   while(CommInterface_PeekPacket(motor->iq_com, &rx_data, &rx_length)) {
     // Share that packet with all client objects
     //    motor->mta_client->ReadMsg(*(motor->iq_com), rx_data, rx_length);
-    CommInterface_ReadMsg(motor->mta, rx_data, rx_length);
+    CommInterface_ReadMsg_Mta(motor->mta, rx_data, rx_length);
     
     // Once we're done with the message packet, drop it
     CommInterface_DropPacket(motor->iq_com);
@@ -119,7 +126,7 @@ void iqCreateMotor(void) {
   return angle;
 }
 
- void iqSetAngle( double target_angle, unsigned long travel_time_ms ) {
+ void iqSetAngle( float target_angle, unsigned long travel_time_ms ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_out[IQ_BUFLEN];
   // Stores length of message to send or receive
@@ -146,11 +153,59 @@ void iqCreateMotor(void) {
   }
 }
 
-void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms ) {
-  double cur_angle;
+void iqSetAngleDelta( float target_angle_delta, unsigned long travel_time_ms ) {
+  float cur_angle;
 
   cur_angle = iqReadAngle();
   iqSetAngle(cur_angle + target_angle_delta, travel_time_ms );
+}
+
+
+///////// BEGIN PMC SECTION
+
+float iqReadAmps( void ) {
+  // This buffer is for passing around messages.
+  uint8_t communication_buffer_in[IQ_BUFLEN];
+  // Stores length of message to send or receive
+  uint8_t communication_length_in;
+
+  float amps;
+
+  ///////////// READ THE INPUT CONTROLLER
+  // Generate the set messages
+  pmc_get(motor->pmc, kSubAmps); 
+
+  // Grab outbound messages in the com queue, store into buffer
+  // If it transferred something to communication_buffer...
+  if(CommInterface_GetTxBytes(motor->iq_pmc_com, communication_buffer_in, &communication_length_in)) {
+    write(communication_buffer_in, communication_length_in);
+  } else {
+    return -1; // should be NAN...
+  }
+  
+  delay(1); // delay 1ms for serial data to transmit data...
+  
+  // Reads however many bytes are currently available
+  communication_length_in = read(communication_buffer_in, IQ_BUFLEN);
+  
+  // Puts the recently read bytes into com's receive queue
+  CommInterface_SetRxBytes(motor->iq_pmc_com, communication_buffer_in, communication_length_in);
+  
+  uint8_t *rx_data; // temporary pointer to received type+data bytes
+  uint8_t rx_length; // number of received type+data bytes
+  // while we have message packets to parse
+  while(CommInterface_PeekPacket(motor->iq_pmc_com, &rx_data, &rx_length)) {
+    // Share that packet with all client objects
+    CommInterface_ReadMsg_Pmc(motor->pmc, rx_data, rx_length);
+    
+    // Once we're done with the message packet, drop it
+    CommInterface_DropPacket(motor->iq_pmc_com);
+  }
+
+  pmc_get_reply(motor->pmc);
+  amps = motor->pmc->data.data.f; // we could dispatch on type, but in this case, we "just know"
+    
+  return amps;
 }
 
 size_t write(const void *buf, size_t count) {

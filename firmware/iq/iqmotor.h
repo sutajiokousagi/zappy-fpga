@@ -18,7 +18,8 @@ typedef struct iqMotor {
   char *com_path;
   struct CommInterface_storage *iq_com;
   struct mta_object *mta;
-  int fd; // dummy to be killed soon!
+  struct CommInterface_storage *iq_pmc_com;
+  struct pmc_object *pmc;
 } iqMotor;
 
 // Create IqMotor object and bind a COM port path to it
@@ -38,19 +39,22 @@ typedef struct iqMotor {
 // read the angle of a motor
 // Arguments: motor_obj (already initialized with prior call to createIqMotor)
 // Returns: current angle of motor, in radians
- double iqReadAngle( void );
+ float iqReadAngle( void );
 
 // set the angle of a motor
 // Arguments: motor object
-// target_angle: double that sets the target angle of the motor in radians
+// target_angle: float that sets the target angle of the motor in radians
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
- void iqSetAngle( double target_angle, unsigned long travel_time_ms );
+ void iqSetAngle( float target_angle, unsigned long travel_time_ms );
 
 // set delta angle based on current angle
 // Arguments: motor object
-// target_angle: double that specifies the desired angular offset from whatever the current angle is
+// target_angle: float that specifies the desired angular offset from whatever the current angle is
 // trave_time_ms: target travel time to get to that angle -- may not be achievable if too short!
- void iqSetAngleDelta( double target_angle_delta, unsigned long travel_time_ms );
+ void iqSetAngleDelta( float target_angle_delta, unsigned long travel_time_ms );
+
+
+float iqReadAmps( void );
 
 #define IQ_BUFLEN 1024   // length of IQ message buffer
 

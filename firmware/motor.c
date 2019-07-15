@@ -44,6 +44,10 @@ void do_motor(char *token) {
   } else if( strcmp(token, "init") == 0 ) {
     printf( "creating motor object\n" );
     iqCreateMotor();
+  } else if( strcmp(token, "amps") == 0 ) {
+    printf( "reading motor amps\n" );
+    float amps = iqReadAmps();
+    printf( "amps as float: %f, as int*1000: %d\n", amps, (int)(amps*1000) );
   } else {
     printf("Motor command %s unrecognized\n", token);
   }
