@@ -21,8 +21,7 @@
 #include "plate.h"
 #include "si1153.h"
 #include "zap.h"
-
-#define HOSTNAME  "zappy-01"
+#include "zappy-calibration.h"
 
 /*
 
@@ -44,40 +43,32 @@ UI elements:
  [current voltage] [last row] [last col]
  [error message area]
 
-Calibration curve measurements: 
-
-At temperature: 29.5C
-
-0.0027V
-slow: 0.715mV
-fast: 0.957mV
-
-4.9967 V
-slow: 21.77mV
-fast: 23.40mV
-
-9.9903 V
-slow: 43.49mV
-fast: 46.52mV
-
-14.986 V
-slow: 65.22 mV  (+/-0.01mV)
-fast: 69.67 mV  (+/-0.01mV)
-
-19.980 V
-slow: 86.94mV
-fast: 92.83mV
-
-24.977 V
-slow: 0.10866V
-fast: 0.11597V
-
-34.966 V
-slow: 0.15212V
-fast: 0.16229V
  */
 
 char ui_notifications[32];
+
+// convert the "slow" ADC code to a voltage
+float convert_code(uint16_t code, uint8_t adc_path) {
+  float lsb = zappy_cal.p5v_adc / 4096.0;
+  
+  float voltage = ((float)code) * lsb - (zappy_cal.p5v_adc / 8192.0);
+  // subtract 0.5LSB as the 0->1 transition occurs at 0.5LSB, not 1.0LSB
+  
+  if( voltage < 0.0 )
+    voltage = 0.0;
+
+  float hv = 0.0;
+  if( adc_path == ADC_SLOW ) {
+    hv = voltage * zappy_cal.slow_m + zappy_cal.slow_b;
+  } else {
+    hv = voltage * zappy_cal.fast_m + zappy_cal.fast_b;
+  }
+
+  if( hv < 0.0 )
+    hv = 0.0;
+
+  return hv;
+}
 
 void oled_ui(void) {
   coord_t width, fontheight;
@@ -94,46 +85,7 @@ void oled_ui(void) {
 
   gdispClear(Black);
 
-  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
-                     ui_notifications, font, White, justifyLeft);
-  line--;
-
-  /////// TODO: add code to measure voltage, track last row/column requests
-  snprintf(uiStr, sizeof(uiStr), "____V, Row x Col yy" );
-  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
-                     uiStr, font, Gray, justifyLeft);
-  line--;
-
-
-  // plate state
-  plate_state pstate = get_platestate();
-  
-  i = snprintf(uiStr, sizeof(uiStr), "prox: %5d / ", getSensorData() );
-  switch(pstate) {
-  case platestate_unlocked:
-    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "unlocked");
-    break;
-  case platestate_locked:
-    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "locked");
-    break;
-  case platestate_warning:
-    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "warning");
-    break;
-  default:
-    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "JAM!");
-    break;
-  }
-  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
-                     uiStr, font, Gray, justifyLeft);
-  line--;
-
-
-  /// hostname
-  snprintf(uiStr, sizeof(uiStr), "Hostname: %s", HOSTNAME);
-  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1) + 3,
-                     uiStr, font, Gray, justifyLeft);
-
-
+  ///// data graph
   // vertical axis
   gdispDrawLine(width/2, 0, width/2, height, Gray);
 
@@ -174,6 +126,48 @@ void oled_ui(void) {
     gdispDrawPixel(width/2 + i, data[i], White);
   }
   
+
+  ///// status data
+  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
+                     ui_notifications, font, White, justifyLeft);
+  line--;
+
+  /////// TODO: add code to measure voltage, track last row/column requests
+  snprintf(uiStr, sizeof(uiStr), "%4dV, Row x Col yy", (int) convert_code(max, ADC_FAST) );
+  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
+                     uiStr, font, Gray, justifyLeft);
+  line--;
+
+
+  // plate state
+  plate_state pstate = get_platestate();
+  
+  i = snprintf(uiStr, sizeof(uiStr), "prox: %5d / ", getSensorData() );
+  switch(pstate) {
+  case platestate_unlocked:
+    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "unlocked");
+    break;
+  case platestate_locked:
+    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "locked");
+    break;
+  case platestate_warning:
+    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "warning");
+    break;
+  default:
+    snprintf(&(uiStr[i]), sizeof(uiStr)-i, "%s", "JAM!");
+    break;
+  }
+  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
+                     uiStr, font, Gray, justifyLeft);
+  line--;
+
+
+  /// hostname
+  snprintf(uiStr, sizeof(uiStr), "Hostname: %s", zappy_cal.hostname);
+  gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1) + 3,
+                     uiStr, font, Gray, justifyLeft);
+
+
   gdispCloseFont(font);
   
   gdispFlush();
