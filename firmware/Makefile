@@ -20,6 +20,8 @@ OBJECTS=	isr.o \
 		si1153.o \
 		gfxapi.o \
 		plate.o \
+                ui.o \
+                zap.o \
 #                assets/rawdata.o \
 
 # prepend our local files to override system ones

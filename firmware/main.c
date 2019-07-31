@@ -27,10 +27,14 @@
 #include "libnet/microudp.h"
 #include "libnet/tftp.h"
 
+#include "gfxconf.h"
+#include "gfx.h"
+
 #include "ui.h"
 #include "si1153.h"
 #include "iqmotor.h"
 #include "motor.h"
+#include "plate.h"
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -115,6 +119,24 @@ int main(void) {
 #endif
   time_init();
   
+  processor_init();
+  processor_start();
+
+  ci_prompt();
+
+  // turn off LEDs
+  led_out_write(0);
+
+  // initialize buzzer PWM frequency and make sure it's off
+  buzzpwm_enable_write(0);
+  buzzpwm_period_write(SYSTEM_CLOCK_FREQUENCY / 3100);
+  buzzpwm_width_write( (SYSTEM_CLOCK_FREQUENCY / 3100) / 2 );
+
+  oproxInit();
+
+  gfxInit();
+  oled_logo();
+  
   // Setup the Ethernet
   unsigned int ip;
   microudp_start(mac_addr, my_ip_addr[0], my_ip_addr[1], my_ip_addr[2], my_ip_addr[3]);
@@ -138,35 +160,25 @@ int main(void) {
   etherbone_init();
 #endif
   
-  processor_init();
-  processor_start();
-
-  ci_prompt();
-
-  // turn off LEDs
-  led_out_write(0);
-
-  // initialize buzzer PWM frequency and make sure it's off
-  buzzpwm_enable_write(0);
-  buzzpwm_period_write(SYSTEM_CLOCK_FREQUENCY / 3100);
-  buzzpwm_width_write( (SYSTEM_CLOCK_FREQUENCY / 3100) / 2 );
-
-  gfxInit();
-  oled_banner();
-
 #ifdef MOTOR
   iqCreateMotor();
+  snprintf(ui_notifications, sizeof(ui_notifications), "Homing the cams...\n");
+  oled_ui();
   printf("Homing the cams...\n");
+  
   plate_home();
+  
+  snprintf(ui_notifications, sizeof(ui_notifications), "Plate cam homed.\n");
+  oled_ui();
   printf("Cams homed\n");
 #endif
-  oproxInit();
   
   while(1) {
     uptime_service();
     processor_service();
     ci_service();
     microudp_service();
+    oled_ui();
 
 #ifdef LIBUIP
     // for now, just echo the incoming telnet characters to the terminal

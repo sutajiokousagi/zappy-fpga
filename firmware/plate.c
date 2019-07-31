@@ -18,9 +18,19 @@
 #include "plate.h"
 #include "delay.h"
 
+#define UNLOCKED 0
+#define LOCKED 1
+#define ERROR 2
+
 static float stopping_angle = 0.0;
 static float home_angle = 0.0;
 static uint8_t homed = 0;
+static float coast_current = 0.0;
+static plate_state pstate = platestate_unlocked;
+
+plate_state get_platestate(void) {
+  return pstate;
+}
 
 uint32_t plate_present(void) {
   if( getSensorData() > PROX_PRESENT_THRESH )
@@ -32,6 +42,12 @@ uint32_t plate_present(void) {
 uint32_t plate_home(void) {
   float cur_angle = 0.0;
   int i;
+
+  iqSetCoast();
+  coast_current = iqReadAmps();
+  delay(100);
+  coast_current = iqReadAmps();
+  delay(100);
   
   cur_angle = iqReadAngle();
   i = 1;
@@ -60,6 +76,7 @@ uint32_t plate_home(void) {
   home_angle = iqReadAngle();
 
   homed = 1;
+  pstate = platestate_unlocked;
 
   return 1;
 }
@@ -81,9 +98,10 @@ uint32_t plate_lock(void) {
 
       motor_current = iqReadAmps();
       // printf( "motor current: %dmA\n", motor_current * 1000.0 );
-      if( motor_current > MOTOR_JAM_CURRENT ) {
+      if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
 	printf( "Motor jam detected at rotation %d\n", i );
 	iqSetAngle(home_angle, 1000);
+	pstate = platestate_error;
 	return 0;
       }
       i++;
@@ -94,10 +112,14 @@ uint32_t plate_lock(void) {
     
     if( i >= PROX_FULL_STROKE ) {
       printf( "Over-rotation: plate may not be engaged fully or missing\n" );
+      pstate = platestate_warning;
       return 0;
-    } else
+    } else {
+      pstate = platestate_locked;
       return 1;
+    }
   } else {
+    pstate = platestate_unlocked;
     return 0;
   }
 }
@@ -115,8 +137,9 @@ uint32_t plate_unlock(void) {
   delay(1000);
 
   motor_current = iqReadAmps();
-  if( motor_current > MOTOR_JAM_CURRENT ) {
+  if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
     buzzpwm_enable_write(1); // sound an alarm
+    pstate = platestate_error;
     return 0;
   }
   cur_angle = iqReadAngle();
@@ -126,9 +149,11 @@ uint32_t plate_unlock(void) {
 
   if( cur_angle > 1.57 ) { // more than half a rotation from the home angle
     buzzpwm_enable_write(1); // sound an alarm
+    pstate = platestate_error;
     return 0;
   }
   
+  pstate = platestate_unlocked;
   return 1;
 }
 
