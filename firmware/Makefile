@@ -19,6 +19,7 @@ OBJECTS=	isr.o \
 		stdio_wrap.o \
 		si1153.o \
 		gfxapi.o \
+		plate.o \
 #                assets/rawdata.o \
 
 # prepend our local files to override system ones
@@ -53,7 +54,7 @@ endif
 
 ifeq (yes,$(USE_IQ))
 	IQFLAGS := -L./iq -liq
-	IQDIR := /home/bunnie/code/zappy-fpga/iq
+	IQDIR := /home/bunnie/code/zappy-fpga/firmware/iq
 
 	OBJECTS += motor.o motor_uart.o
 	CFLAGS += -DMOTOR -I$(IQDIR) -Iiq
@@ -78,7 +79,7 @@ endif
 	$(COPY) $@ boot.bin
 
 
-firmware.elf: $(OBJECTS) uip/libuip.a libnet/libnet.a $(GFXDEPLIBS)
+firmware.elf: $(OBJECTS) uip/libuip.a libnet/libnet.a $(GFXDEPLIBS) iq/libiq.a
 	$(LD) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
@@ -131,6 +132,7 @@ clean:
 	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~ uip/*.o uip/*.a libnet/*.o libnet/*.a assets/ginkgo-logo.h
 	$(MAKE) -C uip/ clean
 	$(MAKE) -C $(GFXDIR) clean
+	$(MAKE) -C $(IQDIR) clean
 
 # Dependencies on generated files
 version.o: version_data.h version_data.c

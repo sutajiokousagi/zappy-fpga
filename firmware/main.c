@@ -27,40 +27,10 @@
 #include "libnet/microudp.h"
 #include "libnet/tftp.h"
 
-#include "gfxconf.h"
-#include "gfx.h"
-#include "ginkgo-logo.h"
-#include "src/gdisp/gdisp_driver.h"
-
-void oled_logo(void) {
-  GDisplay *g = gdispGetDisplay(0);
-  uint8_t *ram = g->priv;
-  memcpy(ram, &ginkgo_logo[119], 8192);
-  g->flags | (GDISP_FLG_DRIVER<<0);
-  
-  gdispFlush();
-}
-
-void oled_banner(void);
-void oled_banner(void) {
-  coord_t width, fontheight;
-  font_t font;
-
-  width = gdispGetWidth();
-  font = gdispOpenFont("UI2");
-  fontheight = gdispGetFontMetric(font, fontHeight);
-
-  gdispClear(Black);
-  gdispDrawStringBox(0, fontheight, width, fontheight * 2,
-                     "Zappy", font, Gray, justifyCenter);
-  gdispDrawStringBox(0, fontheight * 2, width, fontheight * 3,
-                     "EVT1", font, Gray, justifyCenter);
-
-  gdispCloseFont(font);
-  
-  gdispFlush();
-}
-
+#include "ui.h"
+#include "si1153.h"
+#include "iqmotor.h"
+#include "motor.h"
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -184,6 +154,14 @@ int main(void) {
   gfxInit();
   oled_banner();
 
+#ifdef MOTOR
+  iqCreateMotor();
+  printf("Homing the cams...\n");
+  plate_home();
+  printf("Cams homed\n");
+#endif
+  oproxInit();
+  
   while(1) {
     uptime_service();
     processor_service();

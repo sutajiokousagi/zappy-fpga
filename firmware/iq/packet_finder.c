@@ -77,6 +77,7 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
   // copy new data to buffer
   
   int8_t buffer_status = BUFFER_OVERFLOW; // put failure, data loss
+  //printf( "buffer_status: %d\n", buffer_status);
   
   // if end_data comes before start_data, the buffer is wrapped around
   //   and the available storage is guarenteed continuous
@@ -92,6 +93,7 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
     
     if(copy_size == bytes_length)                       // check for data loss
       buffer_status = SUCCESS; // success
+    //printf( "buffer_status: %d\n", buffer_status);
   }
   
   // otherwise available storage might be broken into two pieces
@@ -132,6 +134,8 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
     // check for data loss
     if(first_half + second_half == bytes_length)
       buffer_status = SUCCESS; // success
+    
+    //printf( "buffer_status: %d\n", buffer_status);
   }
    
    
@@ -141,6 +145,7 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
   uint16_t end_data_index = pf->end_data - pf->buffer;
   while( pf->parse_index != end_data_index) {      // parser incrementing
   
+    //printf( "pf->state: %d\n", pf->state);
     switch(pf->state) {
 
       case kStart:
@@ -216,6 +221,7 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
         }
         // else fail the CRC check
         else {
+	  printf("Motor: CRC warning\n" );
           // restart parser at assumed length byte
           pf->parse_index = pf->packet_start_index;
           pf->state = kStart;
@@ -223,10 +229,12 @@ int8_t PutBytes(struct PacketFinder *pf, const uint8_t *bytes, uint16_t bytes_le
         break;
 
       default:
+	printf("fatal error\n" );
         return(FATAL_ERROR);
     } // switch(pf->state)
   } // while( pf->parse_index...)
 
+  //printf( "buffer_status: %d\n", buffer_status);
   return(buffer_status);
 }
 
@@ -375,7 +383,7 @@ void PrintFromBuffer(struct PacketFinder *pf, uint16_t index, uint16_t length) {
   printf("[ ");
   uint8_t i = 0;
   for(i=0; i<length; i++) {
-    printf("%i ", pf->buffer[index]);
+    printf("%02x ", pf->buffer[index]);
     index++;
     if(index >= PACKET_BUFFER_SIZE)
       index = 0;

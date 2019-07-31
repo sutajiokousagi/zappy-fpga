@@ -36,18 +36,27 @@ motor write: 55 03 3b 00 01 06 df 9e 55 06 3b 13 01 00 00 00 00 62 dd 55 06 3b 1
  */
 void do_motor(char *token) {
   if( strcmp(token, "test") == 0 ) {
-    iqSetAngle(3.14 * 2, 2000);  // 24 is full stroke, but 2 is safe for testing
+    iqSetAngle(3.14 * 24, 4000);  // 24 is full stroke, but 2 is safe for testing
     delay(2000);
     delay(10);
-    iqSetAngle(0, 2000);
-    delay(2000);
+    iqSetAngle(0, 4000);
+#if 1    
+    for( int i = 0; i < 40; i++ ) {
+      delay(100);
+      printf("amps: %dmA\n", (int)(iqReadAmps() * 1000) );
+      printf("angle: %d\n", (int)(iqReadAngle() * 1000) );
+    }
+#endif
+    // delay(2000);
   } else if( strcmp(token, "init") == 0 ) {
     printf( "creating motor object\n" );
     iqCreateMotor();
   } else if( strcmp(token, "amps") == 0 ) {
     printf( "reading motor amps\n" );
     float amps = iqReadAmps();
-    printf( "amps as float: %f, as int*1000: %d\n", amps, (int)(amps*1000) );
+    printf( "amps: %dmA\n", (int)(amps*1000) );
+  } else if( strcmp(token, "coast") == 0 ) {
+    iqSetCoast();
   } else {
     printf("Motor command %s unrecognized\n", token);
   }

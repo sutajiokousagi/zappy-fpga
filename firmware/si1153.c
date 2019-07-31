@@ -14,6 +14,30 @@
 #include "si1153.h"
 #include "delay.h"
 
+static i2cSensorConfig_t sensI2C;			//Holds i2c information about the connected sensor
+static Si115xSample_t samples;				//Stores the sample data from reading the sensor
+static uint8_t initialized = SI11XX_NONE;	//Tracks which sensor demo is initialized
+
+void oproxInit(void) {
+  sensI2C.i2cAddress = SI1153_I2C_ADDR;
+  
+  Si115xInitProxAls(&sensI2C, false);
+  getSensorData(); // populate initial recrods
+  
+  Si115xInitProxAls(&sensI2C, true);
+}
+
+int32_t getSensorData(void)
+{
+  // Start next measurement
+  Si115xForce(&sensI2C);
+
+  // Sensor data ready
+  // Process measurement
+  Si115xHandler(&sensI2C, &samples);
+
+  return samples.ch0;
+}
 
 /**************************************************************************//**
  * @brief Write to Si115x i2c.

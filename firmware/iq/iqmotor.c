@@ -81,10 +81,13 @@ void iqCreateMotor(void) {
  float iqReadAngle( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
+  uint8_t communication_buffer_out[IQ_BUFLEN];
   // Stores length of message to send or receive
-  uint8_t communication_length_in;
+  uint8_t communication_length_out;
+  uint16_t communication_length_rx;
 
   float angle;
+  int got_value = 0;
 
   ///////////// READ THE INPUT CONTROLLER
   // Generate the set messages
@@ -92,19 +95,19 @@ void iqCreateMotor(void) {
 
   // Grab outbound messages in the com queue, store into buffer
   // If it transferred something to communication_buffer...
-  if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_in, &communication_length_in)) {
-    write(communication_buffer_in, communication_length_in);
+  if(CommInterface_GetTxBytes(motor->iq_com, communication_buffer_out, &communication_length_out)) {
+    write(communication_buffer_out, communication_length_out);
   } else {
     return -1; // should be NAN...
   }
   
-  delay(1); // delay 1ms for serial data to transmit data...
+  delay(2); // delay 2ms for serial data to transmit data...
   
   // Reads however many bytes are currently available
-  communication_length_in = read(communication_buffer_in, IQ_BUFLEN);
+  communication_length_rx = read(communication_buffer_in, IQ_BUFLEN);
   
   // Puts the recently read bytes into com's receive queue
-  CommInterface_SetRxBytes(motor->iq_com, communication_buffer_in, communication_length_in);
+  CommInterface_SetRxBytes(motor->iq_com, communication_buffer_in, communication_length_rx);
   
   uint8_t *rx_data; // temporary pointer to received type+data bytes
   uint8_t rx_length; // number of received type+data bytes
@@ -116,11 +119,15 @@ void iqCreateMotor(void) {
     
     // Once we're done with the message packet, drop it
     CommInterface_DropPacket(motor->iq_com);
+    if( !got_value ) {
+      angle = motor->mta->data.data.f;
+      got_value = 1;
+    }
   }
 
   //  if( motor->mta_client->obs_angular_displacement_.IsFresh() ) {
   mta_get_reply(motor->mta);
-  angle = motor->mta->data.data.f; // we could dispatch on type, but in this case, we "just know"
+  //angle = motor->mta->data.data.f; // we could dispatch on type, but in this case, we "just know"
   //  }
     
   return angle;
@@ -166,11 +173,24 @@ void iqSetAngleDelta( float target_angle_delta, unsigned long travel_time_ms ) {
 float iqReadAmps( void ) {
   // This buffer is for passing around messages.
   uint8_t communication_buffer_in[IQ_BUFLEN];
-  // Stores length of message to send or receive
+  // Stores length of message to send
   uint8_t communication_length_in;
+  // storel length of messages received
+  uint16_t communication_length_rx;
 
   float amps;
+  int got_value = 0;
 
+  /*
+  memset(&iq_pmc, 0, sizeof(iq_pmc));
+  memset(&iq_pmc_com, 0, sizeof(iq_pmc));
+  motor->iq_pmc_com = &iq_pmc_com;
+  CommInterface_init(motor->iq_pmc_com);
+  
+  motor->pmc = &iq_pmc;
+  pmc_init(motor->pmc, motor->iq_pmc_com, 0);
+  */
+  
   ///////////// READ THE INPUT CONTROLLER
   // Generate the set messages
   pmc_get(motor->pmc, kSubAmps); 
@@ -183,13 +203,14 @@ float iqReadAmps( void ) {
     return -1; // should be NAN...
   }
   
-  delay(1); // delay 1ms for serial data to transmit data...
+  delay(2); // delay 2ms for serial data to transmit data...
   
   // Reads however many bytes are currently available
-  communication_length_in = read(communication_buffer_in, IQ_BUFLEN);
-  
+  communication_length_rx = read(communication_buffer_in, IQ_BUFLEN);
+  //printf( "read length: %d\n", communication_length_rx );
+
   // Puts the recently read bytes into com's receive queue
-  CommInterface_SetRxBytes(motor->iq_pmc_com, communication_buffer_in, communication_length_in);
+  CommInterface_SetRxBytes(motor->iq_pmc_com, communication_buffer_in, communication_length_rx);
   
   uint8_t *rx_data; // temporary pointer to received type+data bytes
   uint8_t rx_length; // number of received type+data bytes
@@ -200,10 +221,15 @@ float iqReadAmps( void ) {
     
     // Once we're done with the message packet, drop it
     CommInterface_DropPacket(motor->iq_pmc_com);
+    if( !got_value ) {  // some weird bug causes multiple returns, and the later ones are bogus
+      amps = motor->pmc->data.data.f;
+      got_value = 1;
+    }
+    // printf( "dbg amps: %dmA\n", (int) (motor->pmc->data.data.f * 1000.0) );
   }
 
   pmc_get_reply(motor->pmc);
-  amps = motor->pmc->data.data.f; // we could dispatch on type, but in this case, we "just know"
+  //  amps = motor->pmc->data.data.f; // we could dispatch on type, but in this case, we "just know"
     
   return amps;
 }
@@ -223,14 +249,23 @@ size_t write(const void *buf, size_t count) {
 
 size_t read(const void *buf, size_t count) {
   int i = 0;
+  int timeout = 0;
   char *rbuf = (char *)buf;
 
-  printf("motor read: ");
+  //  printf("motor read: ");
   for( i = 0; i < count; i++ ) {
-    rbuf[i] = motor_read();
-    printf( "%02x ", rbuf[i] );
+    if( motor_read_nonblock() )
+      rbuf[i] = motor_read();
+    else {
+      timeout++;
+      if( timeout > 100 ) {
+	//printf( "read() timeout\n" );
+	break;
+      }
+    }
+    //    printf( "%02x ", rbuf[i] );
   }
-  printf("\n");
-  return count;
+  //  printf("\n");
+  return (size_t) i;
 }
 

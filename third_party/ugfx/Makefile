@@ -39,7 +39,7 @@ ARFLAGS  = --plugin /opt/riscv/libexec/gcc/riscv64-unknown-elf/8.2.0/liblto_plug
 SRC      = 
 
 OBJS     =
-DEFS     = GFX_OS_HEAP_SIZE=16384
+DEFS     = GFX_OS_HEAP_SIZE=10240
 #DEFS     = 
 LIBS     =
 INCPATH  = $(ZAPPY_DIR)/deps/litex/litex/soc/software/include/base $(ZAPPY_DIR)/deps/litex/litex/soc/software/include $(ZAPPY_DIR)/deps/litex/litex/soc/common $(ZAPPY_DIR)/build/software/include $(ZAPPY_DIR)/firmware $(ZAPPY_DIR)/firmware/riscv $(ZAPPY_DIR)/firmware/assets

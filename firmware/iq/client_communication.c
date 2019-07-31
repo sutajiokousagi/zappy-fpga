@@ -50,8 +50,10 @@ int8_t ParseMsg_Mta(struct mta_object *mta, uint8_t* rx_data, uint8_t rx_length)
     // if sub_idn is within array range (safe to access array at this location)
     if(sub_idn < kEntryLength)
       {
+	//	printf( "kreply: sub %d, type %d, obj %d\n", sub_idn, type_idn, obj_idn );
 	    // if the type and obj identifiers match
-	    if(entry_array_mta[sub_idn].command == type_idn &&
+	if(//entry_array_mta[sub_idn].command == type_idn &&
+	   kTypeAngleMotorControl == type_idn &&
 		 mta->obj_idn == obj_idn)
 		{
 		  // ... then we have a valid message
@@ -77,17 +79,22 @@ int8_t ParseMsg_Pmc(struct pmc_object *pmc, uint8_t* rx_data, uint8_t rx_length)
   enum Access dir = (enum Access) (rx_data[2] & 0b00000011); // low two bits
 
   // if we have a reply (we only parse replies here)
+  //printf( "parsemsg_pmc\n" );
   if(dir == kReply)
   {
+    //    printf( "kreply: sub %d, type %d, obj %d\n", sub_idn, type_idn, obj_idn );
     // if sub_idn is within array range (safe to access array at this location)
     if(sub_idn < kEntryLength_pmc)
       {
+	//printf( "sub_idn in range\n" );
 	    // if the type and obj identifiers match
-	    if(entry_array_pmc[sub_idn].command == type_idn &&
+	if( // entry_array_pmc[sub_idn].command == type_idn &&
+	   kTypePowerMonitor == type_idn &&
 		 pmc->obj_idn == obj_idn)
 		{
 		  // ... then we have a valid message
 		  pmc_Reply(pmc, &rx_data[3], rx_length-3, sub_idn);
+		  //printf( "pmc reply called\n" );
 		  return 1; // I parsed something
 		}
 	    }

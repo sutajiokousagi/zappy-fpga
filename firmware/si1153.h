@@ -410,5 +410,9 @@ float Si1133_getLuxReading( HANDLE si115x_handle,
 float Si1133_getUVReading( HANDLE si115x_handle,
                         Si115xSample_t *samples );
 
+
+int32_t getSensorData(void);
+void oproxInit(void);
+
 #endif /* SI115X_DRV_H_ */
 

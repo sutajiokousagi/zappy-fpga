@@ -97,8 +97,8 @@ _io = [
         Subsignal("discharge", Pins("A5"), IOStandard("LVCMOS33")),  # drv_rdis on schematics
         Subsignal("mb_unplugged", Pins("P10"), IOStandard("LVCMOS33")),
         Subsignal("mk_unplugged", Pins("P3"), IOStandard("LVCMOS33")),
-        Subsignal("l25_pos", Pins("M12"), IOStandard("LVCMOS33")),  # l25_open_dark_lv
-        Subsignal("l25_open", Pins("M11"), IOStandard("LVCMOS33")), # l25_pos_dark_lv
+        Subsignal("l25_pos", Pins("M11"), IOStandard("LVCMOS33")),  # l25_open_dark_lv
+        Subsignal("l25_open", Pins("M12"), IOStandard("LVCMOS33")), # l25_pos_dark_lv
     ),
 
     # other GPIOs
@@ -422,7 +422,9 @@ class ZappySoC(SoCCore):
         SoCCore.__init__(self, platform, clk_freq,
                          integrated_rom_size=bios_size,
                          integrated_sram_size=0x4000,  # stack gets put here at runtime (16k stack)
+                         integrated_sram_init=None,
                          integrated_main_ram_size=0x20000,  # code gets loaded here at runtime
+                         integrated_main_ram_init=None,
                          ident="Zappy LiteX Base SoC",
                          cpu_type="vexriscv",
                          **kwargs)
