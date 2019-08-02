@@ -104,6 +104,16 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 int arp_mode = ARP_MICROUDP;
 #endif
 
+uint8_t telnet_tx = 0;
+void telnet_hook(char c);
+void telnet_hook(char c) {
+#ifdef LIBUIP
+  if(telnet_active && telnet_tx) {
+    telnet_putchar(c);
+  }
+#endif
+}
+  
 int main(void) {
 #ifdef LIBUIP
   telnet_active = 0;
@@ -163,18 +173,19 @@ int main(void) {
   telnet_init();
   etherbone_init();
 #endif
+
+  // hook in telnet
+  console_set_write_hook(telnet_hook);
   
 #ifdef MOTOR
   iqCreateMotor();
   snprintf(ui_notifications, sizeof(ui_notifications), "Homing the cams...\n");
   oled_ui();
-  printf("Homing the cams...\n");
   
   plate_home();
   
   snprintf(ui_notifications, sizeof(ui_notifications), "Plate cam homed.\n");
   oled_ui();
-  printf("Cams homed\n");
 #endif
 
   int interval;
@@ -189,16 +200,6 @@ int main(void) {
     ci_service();
     microudp_service();
     oled_ui();
-
-#ifdef LIBUIP
-    // for now, just echo the incoming telnet characters to the terminal
-    // but later on, this will be the C&C interface to zappy
-    if( telnet_readchar_nonblock() ) {
-      char c;
-      c = telnet_readchar();
-      putchar(c);
-    }
-#endif
   }
 
   return 0;

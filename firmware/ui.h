@@ -7,6 +7,7 @@
 extern char ui_notifications[32];
 extern uint8_t last_row;
 extern uint8_t last_col;
+extern uint8_t telnet_tx;
 
 void oled_logo(void);
 void oled_ui(void);

@@ -125,6 +125,7 @@ uint32_t wait_until_safe(void) {
 }
 
 int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
+  telnet_tx = 1;
   // fundamental hardware modes
   monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
   zappio_triggermode_write(0); // use hardware trigger
@@ -241,5 +242,6 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
 	 monitor_overrun_read());
   printf("Run 'upload' to get a copy of the data\n");
   
+  telnet_tx = 0;
   return 0;
 }

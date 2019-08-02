@@ -165,7 +165,6 @@ void oled_ui(void) {
                      ui_notifications, font, White, justifyLeft);
   line--;
 
-  /////// TODO: add code to measure voltage, track last row/column requests
   snprintf(uiStr, sizeof(uiStr), "%4dV, Row %d Col %d", (int) convert_code(max, ADC_FAST), last_row, last_col );
   gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
                      uiStr, font, Gray, justifyLeft);

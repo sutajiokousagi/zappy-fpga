@@ -31,6 +31,11 @@
 #include "gfxconf.h"
 #include "gfx.h"
 
+#ifdef LIBUIP
+#include "telnet.h"
+#include "etherbone.h"
+#endif
+
 #if 0
 void oled_test(void) {
   coord_t width, fontheight;
@@ -79,8 +84,18 @@ static char *readstr(void)
 	static char s[64];
 	static int ptr = 0;
 
+#ifdef LIBUIP
+	if(readchar_nonblock() || telnet_readchar_nonblock()) {
+	  if( readchar_nonblock() ) {
+	    c[0] = readchar();
+	  } else {
+	    c[0] = telnet_readchar(); // inject telnet commands directly here
+	  }
+	  // printf( "%02x ", c[0] );
+#else
 	if(readchar_nonblock()) {
-		c[0] = readchar();
+	  c[0] = readchar();
+#endif
 		c[1] = 0;
 		switch(c[0]) {
 			case 0x7f:
@@ -161,6 +176,7 @@ void ci_service(void)
 	status_service();
 
 	str = readstr();
+	
 	if(str == NULL) {
 	  str = (char *) dummy;
 	}
@@ -307,5 +323,6 @@ void ci_service(void)
 	if( !was_dummy ) {
 	  ci_prompt();
 	}
+	
 }
 
