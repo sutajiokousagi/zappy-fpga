@@ -31,7 +31,7 @@
 #include "gfxconf.h"
 #include "gfx.h"
 
-
+#if 0
 void oled_test(void) {
   coord_t width, fontheight;
   font_t font;
@@ -48,6 +48,7 @@ void oled_test(void) {
   gdispFlush();
   gdispCloseFont(font);
 }
+#endif
 
 static void ci_help(void)
 {
@@ -58,7 +59,9 @@ static void ci_help(void)
 	wputs("mdio_status - show mdio status");
 #endif
 	wputs("uptime      - show uptime");
-	wputs("upload      - do upload test");
+	wputs("upload      - upload data");
+	wputs("plate       - plate [<lock/unlock>]");
+	wputs("zap         - zap [row, col, voltage] - all args ints");
 	wputs("");
 	wputs("mr          - read address space");
 	wputs("mw          - write address space");
@@ -252,10 +255,6 @@ void ci_service(void)
 	} else if(strcmp(token, "temp") == 0) {
 	  update_temperature();
 	  print_temperature();
-	} else if(strcmp(token, "oled_loop") == 0) {
-	  while(1) {
-	    oled_test();
-	  }
 	} else if(strcmp(token, "debug") == 0) {
 	  token = get_token(&str);
 	  if(strcmp(token, "led") == 0) {

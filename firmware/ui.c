@@ -48,6 +48,20 @@ UI elements:
 
 char ui_notifications[32];
 
+// convert a desired voltage on the MK HV supply to a code suitable for the HV dac
+uint16_t volts_to_hvdac_code(float voltage) {
+  return (uint16_t) ( (voltage * zappy_cal.fs_dac / 1000.0 ) * zappy_cal.hvdac_m + zappy_cal.hvdac_b);
+}
+
+// convert ADC binary code to voltage for the MKHV vmon supply
+float mk_code_to_voltage(uint16_t code) {
+  float lsb = zappy_cal.p5v_adc_logic / 4096.0;
+  
+  float voltage = ((float)code) * lsb - (zappy_cal.p5v_adc_logic / 8192.0);
+
+  return voltage * 200.0;  // 0-5V ADC corresponds to 0-1000V on supply
+}
+
 // convert the ADC binary code to a voltage
 float convert_code(uint16_t code, uint8_t adc_path) {
   float lsb = zappy_cal.p5v_adc / 4096.0;
@@ -152,7 +166,7 @@ void oled_ui(void) {
   line--;
 
   /////// TODO: add code to measure voltage, track last row/column requests
-  snprintf(uiStr, sizeof(uiStr), "%4dV, Row x Col yy", (int) convert_code(max, ADC_FAST) );
+  snprintf(uiStr, sizeof(uiStr), "%4dV, Row %d Col %d", (int) convert_code(max, ADC_FAST), last_row, last_col );
   gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
                      uiStr, font, Gray, justifyLeft);
   line--;

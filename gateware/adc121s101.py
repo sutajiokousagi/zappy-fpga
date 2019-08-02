@@ -265,7 +265,7 @@ class Zappy_adc(Module, AutoCSR):
                 ),
         )
         fsm.act("INCREMENT", # single cycle in sysclk
-                If(count <= (self.depth.storage - self.presample.storage),
+                If(count < (self.depth.storage - self.presample.storage),
                    self.ext_trigger.eq(1),
                 ),
                 NextValue(count, count - 1),
