@@ -85,7 +85,7 @@ static char *readstr(void)
 	static int ptr = 0;
 
 #ifdef LIBUIP
-	if(readchar_nonblock() || telnet_readchar_nonblock()) {
+	while(readchar_nonblock() || telnet_readchar_nonblock()) {
 	  if( readchar_nonblock() ) {
 	    c[0] = readchar();
 	  } else {
