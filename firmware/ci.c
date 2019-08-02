@@ -22,10 +22,11 @@
 #include <net/tftp.h>
 #include "ethernet.h"
 
-#include "i2c.h"
 #include "si1153.h"
 #include "motor.h"
 #include "plate.h"
+#include "temperature.h"
+#include "zap.h"
 
 #include "gfxconf.h"
 #include "gfx.h"
@@ -248,46 +249,9 @@ void ci_service(void)
 	  uint8_t col = strtoul(get_token(&str), NULL, 0);
 	  uint32_t voltage = strtoul(get_token(&str), NULL, 0);
 	  do_zap(row, col, voltage, depth);
-	} else if(strcmp(token, "i2c") == 0) {
-	  token = get_token(&str);
-	  if(strcmp(token, "test") == 0) {
-	    uint8_t tx[3];
-	    uint8_t rx[2];
-	    int ret;
-
-	    tx[0] = 0x1; // pointer
-	    tx[1] = 0x60; // set 12 bits
-	    tx[2] = 0x0;
-	    ret = i2c_master(0x4C, tx, 3, NULL, 0, 50000000);
-	    if( ret ) {
-	      printf( "I2C call returned %d errors\n", ret );
-	    }
-	    
-	    tx[0] = 0x0; // pointer
-	    ret = i2c_master(0x4C, tx, 1, NULL, 0, 50000000);
-	    if( ret ) {
-	      printf( "I2C call returned %d errors\n", ret );
-	    }
-
-	    rx[0] = 0; rx[1] = 0;
-	    ret = i2c_master(0x4C, tx, 0, rx, 2, 50000000);
-	    if( ret ) {
-	      printf( "I2C call returned %d errors\n", ret );
-	    }
-	    printf( "Temperature registers: 0x%02x 0x%02x\n", rx[0], rx[1] );
-	    int16_t inttemp = ((int16_t) rx[0] << 8) | (int16_t)rx[1];
-	    inttemp = inttemp >> 4;
-	    int32_t longtemp = (int32_t) inttemp;
-	    longtemp = longtemp * 625;
-	    uint32_t remainder;
-	    if( longtemp > 0 )
-	      remainder = longtemp % 10000;
-	    else
-	      remainder = -longtemp % 10000;
-	    printf( "Tempertaure: %d.%dC\n", longtemp / 10000, remainder / 1000 );
-	  } else {
-	    printf( "i2c subcommand not recognized\n" );
-	  }
+	} else if(strcmp(token, "temp") == 0) {
+	  update_temperature();
+	  print_temperature();
 	} else if(strcmp(token, "oled_loop") == 0) {
 	  while(1) {
 	    oled_test();

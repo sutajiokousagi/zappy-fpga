@@ -22,6 +22,7 @@
 #include "si1153.h"
 #include "zap.h"
 #include "zappy-calibration.h"
+#include "temperature.h"
 
 /*
 
@@ -47,7 +48,7 @@ UI elements:
 
 char ui_notifications[32];
 
-// convert the "slow" ADC code to a voltage
+// convert the ADC binary code to a voltage
 float convert_code(uint16_t code, uint8_t adc_path) {
   float lsb = zappy_cal.p5v_adc / 4096.0;
   
@@ -69,6 +70,24 @@ float convert_code(uint16_t code, uint8_t adc_path) {
 
   return hv;
 }
+
+// convert a voltage into a *measurement* ADC binary code (not for HVDAC purposes)
+// used to program a "SCRAM" target for "do not exceed" feedback levels (if desired)
+// and for capacitor target voltage measurements
+uint16_t convert_voltage_adc_code(float hv, uint8_t adc_path) {
+  float voltage = 0.0;
+  if( adc_path == ADC_SLOW ) {
+    voltage = (hv - zappy_cal.slow_b) / zappy_cal.slow_m;
+  } else {
+    voltage = (hv - zappy_cal.fast_b) / zappy_cal.fast_m;
+  }
+
+  float lsb = zappy_cal.p5v_adc / 4096.0;
+  uint16_t code = (uint16_t) ((voltage + (zappy_cal.p5v_adc / 8192.0)) / lsb); // slightly wrong as it rounds up
+
+  return code;
+}
+
 
 void oled_ui(void) {
   coord_t width, fontheight;
@@ -163,7 +182,16 @@ void oled_ui(void) {
 
 
   /// hostname
-  snprintf(uiStr, sizeof(uiStr), "Hostname: %s", zappy_cal.hostname);
+  int32_t maxtemp;
+  char name[8];
+  max_temperature(&maxtemp, name);  // this doesn't update the reading, just fetches the max
+  uint32_t remainder;
+  if( maxtemp > 0 )
+    remainder = maxtemp % 10000;
+  else
+    remainder = -maxtemp % 10000;
+  
+  snprintf(uiStr, sizeof(uiStr), "%s %d.%dC %s", zappy_cal.hostname, maxtemp / 10000, remainder / 1000, name);
   gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1) + 3,
                      uiStr, font, Gray, justifyLeft);
 

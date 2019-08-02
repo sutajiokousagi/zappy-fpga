@@ -5,6 +5,8 @@
 extern "C" {
 #endif
   
+void do_motor(char *token);
+  
 void motor_init(void);
 void motor_isr(void);
 void motor_sync(void);

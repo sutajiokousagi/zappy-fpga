@@ -14,6 +14,60 @@
 
 #include "zap.h"
 #include "delay.h"
+#include "ui.h"
+
+uint32_t wait_until_voltage(uint32_t voltage);
+
+#define VOLT_TOLERANCE 0.01
+#define WAIT_TIMEOUT   100   // timeout in ms
+// returns 0 if success, 1 if timeout
+uint32_t wait_until_voltage(uint32_t voltage) {
+  // core acquisition/trigger loop
+  int acq_timer, start_time, delta;
+  float pct_diff;
+  float cur_v = 0.0;
+  uint16_t  *data = (uint16_t *)MONITOR_BASE;
+  
+  monitor_depth_write(10);
+  monitor_presample_write(200); // won't trigger during monitor acquisition, because presample > depth
+
+  elapsed(&acq_timer, -1);
+  start_time = acq_timer;
+  do {
+    pct_diff = ((float) voltage) - cur_v;
+    pct_diff = pct_diff / (float) voltage;
+    
+    monitor_acquire_write(1); // start acquisition & trigger cycle
+    while( monitor_done_read() ) // wait for done to go 0
+      ;
+    while( monitor_done_read() == 0 ) // wait for done to go back to a 1
+      ; // in this loop here, we could monitor the current and stop the zap if it goes too high
+
+    
+    // update delta timer
+    elapsed(&acq_timer, -1);
+    delta = acq_timer - start_time;
+    if( delta < 0 )
+      delta += timer0_reload_read();
+
+    // grab the voltage
+    cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
+    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/SYSTEM_CLOCK_FREQUENCY), (int) (pct_diff * 100));
+  } while( (pct_diff >= VOLT_TOLERANCE) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_TIMEOUT) );
+  
+  if( pct_diff < -0.01 ) {
+    printf( "warning: target voltage overshoot!\n" );
+    // return immediately in this case, to avoid any further charging of the capacitor
+    return 0;
+  }
+  
+  delay_ms(1);  // wait 1 millisecond longer, this should help improve any convergence/noise gap
+
+  if( pct_diff >= VOLT_TOLERANCE )
+    return 1; // timed out
+  else
+    return 0;
+}
 
 int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   // fundamental hardware modes
@@ -72,11 +126,10 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   
   // now here we would wait until we got to the desired voltage
   // (code to wait until the cap voltage is correct)
-  monitor_depth_write(1); // depth one
   // use the monitor_acquire_write(1) API with a depth of 1 to update the instantaneous ADC readback values
-  delay(100);
-  printf( "WARNING: missing code to wait until cap voltage is correct\n" );
-  
+  if( wait_until_voltage(voltage) ) {
+    printf( "WARNING: timeout waiting for voltage" );
+  }
   
   // core acquisition/trigger loop
   int acq_timer, start_time;

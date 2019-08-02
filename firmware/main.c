@@ -36,6 +36,7 @@
 #include "motor.h"
 #include "plate.h"
 #include "zappy-calibration.h"
+#include "temperature.h"
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -138,6 +139,7 @@ int main(void) {
 
   gfxInit();
   oled_logo();
+  update_temperature();
   
   // Setup the Ethernet
   unsigned int ip;
@@ -174,8 +176,14 @@ int main(void) {
   oled_ui();
   printf("Cams homed\n");
 #endif
+
+  int interval;
+  elapsed(&interval, -1);
   
   while(1) {
+    if( elapsed(&interval, SYSTEM_CLOCK_FREQUENCY / 2) ) { // twice a second update the temperature
+      update_temperature();
+    }
     uptime_service();
     processor_service();
     ci_service();

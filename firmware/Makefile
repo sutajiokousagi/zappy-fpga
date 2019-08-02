@@ -22,6 +22,7 @@ OBJECTS=	isr.o \
 		plate.o \
                 ui.o \
                 zap.o \
+                temperature.o \
 #                assets/rawdata.o \
 
 # prepend our local files to override system ones
