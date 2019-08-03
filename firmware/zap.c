@@ -182,7 +182,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
 
   // basic safety status
   if( zappio_scram_status_read() ) {
-    printf( "ERROR: zappio is indicating a SCRAM condition. Abortin. : zerr\n" );
+    printf( "ERROR: zappio is indicating a SCRAM condition. Aborting. : zerr\n" );
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: SCRAM abort");
     return -1;
   }
