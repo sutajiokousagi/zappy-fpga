@@ -66,8 +66,8 @@ uint32_t plate_home(void) {
   // now slowly close it
   i = 1;
   while( zappio_l25_open_read() ) {
-    iqSetAngle( cur_angle - (0.1 * (float) i), 20);
-    delay(30);
+    iqSetAngle( cur_angle - (0.1 * (float) i), 10);
+    delay(20);
     i++;
   }
 
@@ -102,7 +102,7 @@ uint32_t plate_lock(void) {
       // printf( "motor current: %dmA\n", motor_current * 1000.0 );
       if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
 	snprintf(ui_notifications, sizeof(ui_notifications), "Lock: motor jam (%d)\n", i);
-	printf( "Motor jam detected at rotation %d\n", i );
+	printf( "Motor jam detected at rotation %d : zerr\n", i );
 	iqSetAngle(home_angle, 1000);
 	pstate = platestate_error;
 	telnet_tx = 0;
@@ -111,13 +111,13 @@ uint32_t plate_lock(void) {
       i++;
     };
 
-    printf( "Plate locked at rotation count: %d\n", i );
     snprintf(ui_notifications, sizeof(ui_notifications), "Lock: success (%d)", i);
+    printf( "Plate locked at rotation count: %d : zpass\n", i );
     stopping_angle = iqReadAngle();
     
     if( i >= PROX_FULL_STROKE ) {
       snprintf(ui_notifications, sizeof(ui_notifications), "Lock: over-rotate (%d)", i);
-      printf( "Over-rotation: plate may not be engaged fully or missing\n" );
+      printf( "Over-rotation: plate may not be engaged fully or missing : zerr\n" );
       pstate = platestate_warning;
       telnet_tx = 0;
       return 0;
@@ -127,6 +127,7 @@ uint32_t plate_lock(void) {
       return 1;
     }
   } else {
+    printf( "Plate not present : zerr\n" );
     snprintf(ui_notifications, sizeof(ui_notifications), "Lock: plate not present", i);
     pstate = platestate_unlocked;
     telnet_tx = 0;
@@ -150,6 +151,7 @@ uint32_t plate_unlock(void) {
   motor_current = iqReadAmps();
   if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
     buzzpwm_enable_write(1); // sound an alarm
+    printf("unlock jam : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: JAM");
     pstate = platestate_error;
     telnet_tx = 0;
@@ -163,6 +165,7 @@ uint32_t plate_unlock(void) {
   if( cur_angle > 1.57 ) { // more than half a rotation from the home angle
     buzzpwm_enable_write(1); // sound an alarm
     pstate = platestate_error;
+    printf("homing fail : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: homing fail");
     telnet_tx = 0;
     return 0;
@@ -170,7 +173,7 @@ uint32_t plate_unlock(void) {
   
   pstate = platestate_unlocked;
   snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: success");
-  printf( "Unlock: success\n" );
+  printf( "unlock success : zpass\n" );
   telnet_tx = 0;
   return 1;
 }

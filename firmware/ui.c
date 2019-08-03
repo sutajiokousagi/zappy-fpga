@@ -47,6 +47,7 @@ UI elements:
  */
 
 char ui_notifications[32];
+uint32_t sampledepth = 10000;
 
 // convert a desired voltage on the MK HV supply to a code suitable for the HV dac
 uint16_t volts_to_hvdac_code(float voltage) {
@@ -126,7 +127,7 @@ void oled_ui(void) {
   gdispDrawLine(width/2, height-1, width, height-1, Gray);
 
   uint16_t *y = (uint16_t *)MONITOR_BASE;
-  uint16_t stride = SAMPLEDEPTH / (width/2);
+  uint16_t stride = sampledepth / (width/2);
   uint16_t data[width/2];
 
   for( i = 0; i < width/2; i++ ) {
@@ -165,7 +166,7 @@ void oled_ui(void) {
                      ui_notifications, font, White, justifyLeft);
   line--;
 
-  snprintf(uiStr, sizeof(uiStr), "%4dV, Row %d Col %d", (int) convert_code(max, ADC_FAST), last_row, last_col );
+  snprintf(uiStr, sizeof(uiStr), "%4dV, Row %d Col %d", (int) convert_code(max, ADC_FAST), last_row+1, last_col+1 );
   gdispDrawStringBox(0, fontheight * line, width, fontheight * (line + 1),
                      uiStr, font, Gray, justifyLeft);
   line--;

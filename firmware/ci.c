@@ -161,10 +161,6 @@ void ci_prompt(void)
   wprintf("ZAPPY %s> ", uptime_str());
 }
 
-#define DEFAULT_TFTP_SERVER_PORT 69  /* IANA well known port: UDP/69 */
-#ifndef TFTP_SERVER_PORT
-#define TFTP_SERVER_PORT DEFAULT_TFTP_SERVER_PORT
-#endif
 void ci_service(void)
 {
 	char *str;
@@ -267,7 +263,8 @@ void ci_service(void)
 	  uint8_t row = strtoul(get_token(&str), NULL, 0);
 	  uint8_t col = strtoul(get_token(&str), NULL, 0);
 	  uint32_t voltage = strtoul(get_token(&str), NULL, 0);
-	  do_zap(row, col, voltage, depth);
+	  uint32_t time_us = strtoul(get_token(&str), NULL, 0);
+	  do_zap(row, col, voltage, time_us);
 	} else if(strcmp(token, "temp") == 0) {
 	  update_temperature();
 	  print_temperature();

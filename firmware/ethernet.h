@@ -21,6 +21,11 @@ extern unsigned char mac_addr[6];
 extern unsigned char my_ip_addr[];
 extern unsigned char host_ip_addr[];
 
+#define DEFAULT_TFTP_SERVER_PORT 69  /* IANA well known port: UDP/69 */
+#ifndef TFTP_SERVER_PORT
+#define TFTP_SERVER_PORT DEFAULT_TFTP_SERVER_PORT
+#endif
+
 #ifdef LIBUIP
 extern int arp_mode;
 #define ARP_MICROUDP 0
