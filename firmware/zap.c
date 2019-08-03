@@ -241,7 +241,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
       // core acquisition/trigger loop
       int acq_timer, start_time;
       monitor_depth_write(depth);
-      monitor_presample_write(1000); // TODO ** change to 200 samples before engaging the zap (1000 for now for exaggerated effect)
+      monitor_presample_write(1000); // IF THIS CHANGES -- need to update zappy.py to change the preamble compensation time
   
       elapsed(&acq_timer, -1);
       start_time = acq_timer;
