@@ -20,6 +20,11 @@ from gateware.dac8560 import Dac8560
 #   CSR triggersoft (wo, 1) - software trigger when set
 #   CSR triggerclear (wo, 1) - clear hardware trigger when anything is written; also cleared if row/col mapping updated
 #   CSR triggerstatus (ro, 1) - current status of the trigger
+#   CSR maxdelta (wo, 16) - maximum delta code for current before scram
+#   CSR maxdelta_ena (wo, 1) - enable max delta code scram machine
+#   CSR maxdelta_reset (wo, 1) - reset maxdelta SCRAM condition
+#   CSR maxdelta_scram (ro, 1) - set if there was a SCRAM condition detected on the last run
+#   self.*delta* `Signal(16)` - INPUT - the delta code computed live during the run
 
 class Zappio(Module, AutoCSR):
     def __init__(self, pads, hvdac_pads):
@@ -38,8 +43,9 @@ class Zappio(Module, AutoCSR):
         self.comb += self.noplate.status.eq(noplate_sync)
 
         self.override_safety = CSRStorage(1)
+        maxdelta_scram = Signal()
         # noplate should be all 0's if a plate is properly present, do not apply HV if plate is absent
-        self.comb += myscram.eq( (self.scram | (noplate_sync != 0)) & ~self.override_safety.storage)
+        self.comb += myscram.eq( (self.scram | (noplate_sync != 0) | maxdelta_scram) & ~self.override_safety.storage)
         self.scram_status = CSRStatus(1)
         self.comb += self.scram_status.status.eq(myscram)
 
@@ -87,6 +93,24 @@ class Zappio(Module, AutoCSR):
                 col_gpio.eq(self.col.storage),
             ),
             self.triggerstatus.status.eq(mytrigger)
+        ]
+
+        self.maxdelta = CSRStorage(16)
+        self.maxdelta_ena = CSRStorage(16)
+        self.maxdelta_reset = CSRStorage(1)  # probably not really needed because triggerclear also resets maxdelta scram
+        self.maxdelta_scram = CSRStatus(1)
+        self.delta = Signal(16)
+        self.comb += self.maxdelta_scram.status.eq(maxdelta_scram)
+        self.sync += [
+            If(self.maxdelta_reset.re | self.triggerclear.re,
+               maxdelta_scram.eq(0)
+            ).Else(
+               If( mytrigger & (self.delta >= self.maxdelta.storage) & self.maxdelta_ena.storage, # only consider delta during trigger
+                   maxdelta_scram.eq(1),
+               ).Else(
+                   maxdelta_scram.eq(maxdelta_scram)
+               )
+            )
         ]
 
         # report if the HV motherboard has been unplugged and we are somehow operating in either a debug mode or a really bad error mode

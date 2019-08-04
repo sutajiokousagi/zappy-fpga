@@ -13,6 +13,7 @@ typedef struct _cal_record {
   float fs_dac;
   float hvdac_m;
   float hvdac_b;
+  float capres;
 } cal_record;
 
 extern const cal_record zappy_cal;

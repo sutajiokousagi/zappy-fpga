@@ -27,6 +27,8 @@
 #include "plate.h"
 #include "temperature.h"
 #include "zap.h"
+#include "zappy-calibration.h"
+#include "ui.h"
 
 #include "gfxconf.h"
 #include "gfx.h"
@@ -59,10 +61,6 @@ static void ci_help(void)
 {
 	wputs("help        - this command");
 	wputs("reboot      - reboot CPU");
-#ifdef CSR_ETHPHY_MDIO_W_ADDR
-	wputs("mdio_dump   - dump mdio registers");
-	wputs("mdio_status - show mdio status");
-#endif
 	wputs("uptime      - show uptime");
 	wputs("upload      - upload data");
 	wputs("plate       - plate [<lock/unlock>]");
@@ -190,12 +188,6 @@ void ci_service(void)
 	else if(strcmp(token, "mr") == 0) mr(get_token(&str), get_token(&str));
 	else if(strcmp(token, "mw") == 0) mw(get_token(&str), get_token(&str), get_token(&str));
 	else if(strcmp(token, "mc") == 0) mc(get_token(&str), get_token(&str), get_token(&str));
-#ifdef CSR_ETHPHY_MDIO_W_ADDR
-	else if(strcmp(token, "mdio_status") == 0)
-		mdio_status();
-	else if(strcmp(token, "mdio_dump") == 0)
-		mdio_dump();
-#endif
 	else if(strcmp(token, "uptime") == 0)
 	  uptime_print();
 	else if(strcmp(token, "upload") == 0) {
@@ -264,7 +256,21 @@ void ci_service(void)
 	  uint8_t col = strtoul(get_token(&str), NULL, 0);
 	  uint32_t voltage = strtoul(get_token(&str), NULL, 0);
 	  uint32_t time_us = strtoul(get_token(&str), NULL, 0);
-	  do_zap(row, col, voltage, time_us);
+	  int32_t max_current_ma = strtol(get_token(&str), NULL, 0); // max_current in mA
+	  // turn current into a voltage by multiplying it by capres
+	  float max_voltage = (((float) max_current_ma) / 1000.0) * zappy_cal.capres;
+	  if( max_voltage > 1000.0 ) 
+	    max_voltage = 1000.0;
+	  int16_t max_current_code;
+	  if( max_current_ma < 0 )
+	    max_current_code = -1; // tells the loop to ignore the setting
+	  else {
+	    // we assume ADC_SLOW is the "master" calibration path for the reference curves
+	    max_current_code = (int16_t) convert_voltage_adc_code(max_voltage, ADC_SLOW);
+	    if( max_current_code > 0xfff )
+	      max_current_code = 0xfff;
+	  }
+	  do_zap(row, col, voltage, time_us, max_current_code);
 	} else if(strcmp(token, "temp") == 0) {
 	  update_temperature();
 	  print_temperature();

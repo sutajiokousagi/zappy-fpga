@@ -132,7 +132,7 @@ uint32_t wait_until_safe(void) {
 }
 
 // depth is equivalent to time in microseconds (each sample is one microsecond)
-int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
+int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16_t max_current_code) {
   int r, c, rstart, cstart, rend, cend;
   
   telnet_tx = 1;
@@ -210,6 +210,17 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
     return -1;
   }
 
+  if( max_current_code > 0xFFF ) {
+    snprintf(ui_notifications, sizeof(ui_notifications), "Zap: maxcur prog err");
+    printf( "WARNING: max current code out of range, ignoring request : zerr\n" );
+  }
+  if( max_current_code >= 0 && max_current_code <= 0xFFF ) {
+    zappio_maxdelta_ena_write(1);
+    zappio_maxdelta_write( (uint16_t) max_current_code );
+  } else {
+    zappio_maxdelta_ena_write(0);
+  }
+
   // disconnect fast-discharge resistor, connect capacitor
   zappio_discharge_write(0); // make sure the discharge resistor is disengaged before engaging the capacitor
   zappio_cap_write(1);
@@ -265,7 +276,15 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
       if( delta < 0 )
 	delta += timer0_reload_read();
 
-      // clear the trigger
+      // check if maxdelta current scram happened during zap
+      if( zappio_maxdelta_ena_read() ) {
+	if( zappio_maxdelta_scram_read() ) {
+	  snprintf(ui_notifications, sizeof(ui_notifications), "Zap: arc on r%d c%d", r+1, c+1);
+	  status_led = LED_STATUS_RED;
+	  printf( "WARNING: max current limit hit on row %d col %d : zwarn", r+1, c+1 );
+	}
+      }
+      // clear the trigger; this also clears the maxdelta scram
       zappio_triggerclear_write(1);
       
       // disengage the row/col so the cap can charge

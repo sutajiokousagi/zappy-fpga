@@ -85,6 +85,7 @@ int mdio_read(int phyadr, int reg)
 	return r;
 }
 
+#if 0 // not enough space for this...
 void mdio_dump(void) {
 	int i;
 	for(i=0; i<32; i++)
@@ -123,5 +124,6 @@ int mdio_status(void) {
 	wprintf("\n");
 	return 0;
 }
+#endif
 
 #endif
