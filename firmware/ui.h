@@ -9,6 +9,10 @@ extern uint8_t last_row;
 extern uint8_t last_col;
 extern uint8_t telnet_tx;
 
+#define LED_STATUS_GREEN 2
+#define LED_STATUS_RED 1
+extern uint8_t status_led;
+
 void oled_logo(void);
 void oled_ui(void);
 float convert_code(uint16_t code, uint8_t adc_path);

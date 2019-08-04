@@ -41,7 +41,7 @@ slow: 43.49mV
 fast: 46.52mV
 
 14.986 V
-slow: 65.22 mV  (+/-0.01mV)
+slow: 6.22 mV  (+/-0.01mV)
 fast: 69.67 mV  (+/-0.01mV)
 
 19.980 V
@@ -66,6 +66,7 @@ fast: 0.16229V
 #define FS_DAC  9.9643
 #define HVDAC_M 6556.4623
 #define HVDAC_B 201.1304
+#define CAPRES  46.79   // ohms, measured at 27.5C
 #endif
 
 

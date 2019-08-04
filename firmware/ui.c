@@ -48,6 +48,7 @@ UI elements:
 
 char ui_notifications[32];
 uint32_t sampledepth = 10000;
+uint8_t status_led = 0;
 
 // convert a desired voltage on the MK HV supply to a code suitable for the HV dac
 uint16_t volts_to_hvdac_code(float voltage) {
@@ -112,6 +113,8 @@ void oled_ui(void) {
   int line = 3;
   int i = 0;
 
+  led_out_write( status_led );
+  
   width = gdispGetWidth();
   height = gdispGetHeight();
   font = gdispOpenFont("UI2");

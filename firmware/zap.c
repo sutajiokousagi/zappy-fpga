@@ -28,6 +28,7 @@ uint8_t last_col = 0;
 
 #define VOLT_TOLERANCE 0.01
 #define WAIT_TIMEOUT   100   // timeout in ms
+#define WAIT_CHARGE_TIMEOUT 250 // timout in ms
 #define SAFE_THRESH    10.0  // safety threshold in volts, if under this, we can move to next operation
 
 // returns 0 if success, 1 if timeout
@@ -64,7 +65,7 @@ uint32_t wait_until_voltage(uint32_t voltage) {
     // grab the voltage
     cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
     //    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/SYSTEM_CLOCK_FREQUENCY), (int) (pct_diff * 100));
-  } while( (pct_diff >= VOLT_TOLERANCE) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_TIMEOUT) );
+  } while( (pct_diff >= VOLT_TOLERANCE) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_CHARGE_TIMEOUT) );
   
   if( pct_diff < -0.01 ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV overshoot");
@@ -118,10 +119,12 @@ uint32_t wait_until_safe(void) {
   
   if( cur_v > SAFE_THRESH ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: main cap unsafe %dV", (int) cur_v);
+    status_led = LED_STATUS_RED;
     return 1;
   }
   if( mk_v > SAFE_THRESH ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: MK cap unsafe %dV", (int) mk_v);
+    status_led = LED_STATUS_RED;
     return 2;
   }
   
@@ -143,12 +146,14 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   if( voltage > 1000 ) {
     printf( "Voltage out of range (0-1000): %d : zerr\n", voltage );
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: request V err %d", voltage);
+    status_led = LED_STATUS_RED;
     return -1;
   }
   // pull in row/col
   if( row > 4 ) {
     printf( "Row out of range (0-3): %d : zerr\n", row );
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: request row err %d", row);
+    status_led = LED_STATUS_RED;
     return -1;
   }
   if( row == 4 ) {
@@ -175,6 +180,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   if( depth >= 16384 ) { // this constant is in zappy.py memdepth
     printf( "Depth too long: %d : zerr\n", depth );
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: depth err %d", depth);
+    status_led = LED_STATUS_RED;
     return -1;
   } else {
     sampledepth = depth; // global for the UI routine
@@ -184,6 +190,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   if( zappio_scram_status_read() ) {
     printf( "ERROR: zappio is indicating a SCRAM condition. Aborting. : zerr\n" );
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: SCRAM abort");
+    status_led = LED_STATUS_RED;
     return -1;
   }
   if( zappio_override_safety_read() ) {
@@ -193,11 +200,13 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   if( zappio_mb_unplugged_read() ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: MB unplugged");
     printf( "WARNING: motherboard seems to be unplugged. : zerr\n" );
+    status_led = LED_STATUS_RED;
     return -1;
   }
   if( zappio_mk_unplugged_read() ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV unplugged");
     printf( "WARNING: HV supply seems to be unplugged. : zerr\n" );
+    status_led = LED_STATUS_RED;
     return -1;
   }
 
@@ -234,6 +243,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
       // use the monitor_acquire_write(1) API with a depth of 1 to update the instantaneous ADC readback values
       if( wait_until_voltage(voltage) ) {
 	snprintf(ui_notifications, sizeof(ui_notifications), "Zap: charge timeout");
+	status_led = LED_STATUS_RED;
 	printf( "WARNING: timeout waiting for voltage : zwarn" );
       }
       zappio_triggerclear_write(1);
@@ -291,7 +301,8 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   zappio_discharge_write(1); // turn on the capacitor discharge resistor
   
   if( wait_until_safe() ) {
-	printf( "WARNING: storage cap not discharged : zwarn\n" ); // ui error message is in the wait_until_safe() api call
+    printf( "WARNING: storage cap not discharged : zwarn\n" ); // ui error message is in the wait_until_safe() api call
+    status_led = LED_STATUS_RED;
   }
   
   zappio_discharge_write(0);
@@ -302,5 +313,6 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth) {
   printf("Zap run finished : zpass\n");
   
   telnet_tx = 0;
+  status_led = LED_STATUS_GREEN;
   return 0;
 }

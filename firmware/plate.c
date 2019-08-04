@@ -79,6 +79,7 @@ uint32_t plate_home(void) {
   homed = 1;
   pstate = platestate_unlocked;
 
+  status_led = LED_STATUS_GREEN;
   return 1;
 }
 
@@ -103,6 +104,7 @@ uint32_t plate_lock(void) {
       if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
 	snprintf(ui_notifications, sizeof(ui_notifications), "Lock: motor jam (%d)\n", i);
 	printf( "Motor jam detected at rotation %d : zerr\n", i );
+	status_led = LED_STATUS_RED;
 	iqSetAngle(home_angle, 1000);
 	pstate = platestate_error;
 	telnet_tx = 0;
@@ -113,11 +115,13 @@ uint32_t plate_lock(void) {
 
     snprintf(ui_notifications, sizeof(ui_notifications), "Lock: success (%d)", i);
     printf( "Plate locked at rotation count: %d : zpass\n", i );
+    status_led = LED_STATUS_GREEN;
     stopping_angle = iqReadAngle();
     
     if( i >= PROX_FULL_STROKE ) {
       snprintf(ui_notifications, sizeof(ui_notifications), "Lock: over-rotate (%d)", i);
       printf( "Over-rotation: plate may not be engaged fully or missing : zerr\n" );
+      status_led = LED_STATUS_RED;
       pstate = platestate_warning;
       telnet_tx = 0;
       return 0;
@@ -130,6 +134,7 @@ uint32_t plate_lock(void) {
     printf( "Plate not present : zerr\n" );
     snprintf(ui_notifications, sizeof(ui_notifications), "Lock: plate not present", i);
     pstate = platestate_unlocked;
+    status_led = LED_STATUS_RED;
     telnet_tx = 0;
     return 0;
   }
@@ -153,6 +158,7 @@ uint32_t plate_unlock(void) {
     buzzpwm_enable_write(1); // sound an alarm
     printf("unlock jam : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: JAM");
+    status_led = LED_STATUS_RED;
     pstate = platestate_error;
     telnet_tx = 0;
     return 0;
@@ -167,6 +173,7 @@ uint32_t plate_unlock(void) {
     pstate = platestate_error;
     printf("homing fail : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: homing fail");
+    status_led = LED_STATUS_RED;
     telnet_tx = 0;
     return 0;
   }
@@ -174,6 +181,7 @@ uint32_t plate_unlock(void) {
   pstate = platestate_unlocked;
   snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: success");
   printf( "unlock success : zpass\n" );
+  status_led = LED_STATUS_GREEN;
   telnet_tx = 0;
   return 1;
 }

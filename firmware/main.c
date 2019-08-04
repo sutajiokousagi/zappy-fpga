@@ -187,6 +187,7 @@ int main(void) {
   snprintf(ui_notifications, sizeof(ui_notifications), "Plate cam homed.\n");
   oled_ui();
 #endif
+  status_led = LED_STATUS_GREEN;
 
   int interval;
   elapsed(&interval, -1);
