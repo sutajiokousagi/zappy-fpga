@@ -30,6 +30,7 @@ uint8_t last_col = 0;
 #define WAIT_TIMEOUT   100   // timeout in ms
 #define WAIT_CHARGE_TIMEOUT 250 // timout in ms
 #define SAFE_THRESH    10.0  // safety threshold in volts, if under this, we can move to next operation
+#define CHARGE_RETRY_LIMIT 3
 
 // returns 0 if success, 1 if timeout
 uint32_t wait_until_voltage(uint32_t voltage) {
@@ -38,45 +39,105 @@ uint32_t wait_until_voltage(uint32_t voltage) {
   float pct_diff;
   float cur_v = 0.0;
   uint16_t  *data = (uint16_t *)MONITOR_BASE;
-  
+  int charge_retry = 0;
+  int converged = 0;
+  float volt_tolerance = VOLT_TOLERANCE;
+
+  // at lower voltages, the tolerance is not as tight due to the range becoming smaller relative to the absolute accuracy of the circuitry
+  if( voltage < 200 )
+    volt_tolerance = 0.025;
+  if( voltage < 120 )
+    volt_tolerance = 0.05;
+
+  // setup the loop to run
   zappio_triggerclear_write(1);
   monitor_depth_write(10);
   monitor_presample_write(10); // presample == depth will prevent trigger from ever happening
 
   elapsed(&acq_timer, -1);
   start_time = acq_timer;
-  do {
-    pct_diff = ((float) voltage) - cur_v;
-    pct_diff = pct_diff / (float) voltage;
+  while( charge_retry < CHARGE_RETRY_LIMIT && !converged ) {
+    do {
+      pct_diff = ((float) voltage) - cur_v;
+      pct_diff = pct_diff / (float) voltage;
+      
+      monitor_acquire_write(1); // start acquisition & trigger cycle
+      while( monitor_done_read() ) // wait for done to go 0
+	;
+      while( monitor_done_read() == 0 ) // wait for done to go back to a 1
+	; // in this loop here, we could monitor the current and stop the zap if it goes too high
+      
     
-    monitor_acquire_write(1); // start acquisition & trigger cycle
-    while( monitor_done_read() ) // wait for done to go 0
-      ;
-    while( monitor_done_read() == 0 ) // wait for done to go back to a 1
-      ; // in this loop here, we could monitor the current and stop the zap if it goes too high
-
-    
-    // update delta timer
-    elapsed(&acq_timer, -1);
-    delta = acq_timer - start_time;
-    if( delta < 0 )
-      delta += timer0_reload_read();
-
-    // grab the voltage
-    cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
-    //    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/SYSTEM_CLOCK_FREQUENCY), (int) (pct_diff * 100));
-  } while( (pct_diff >= VOLT_TOLERANCE) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_CHARGE_TIMEOUT) );
+      // update delta timer
+      elapsed(&acq_timer, -1);
+      delta = acq_timer - start_time;
+      if( delta < 0 )
+	delta += timer0_reload_read();
+      
+      // grab the voltage
+      cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
+      //    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/SYSTEM_CLOCK_FREQUENCY), (int) (pct_diff * 100));
+    } while( (pct_diff >= volt_tolerance) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_CHARGE_TIMEOUT) );
   
-  if( pct_diff < -0.01 ) {
-    snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV overshoot");
-    printf( "warning: target voltage overshoot! : zwarn\n" );
-    // return immediately in this case, to avoid any further charging of the capacitor
-    return 0;
+    if( pct_diff < -0.01 ) {
+      snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV overshoot");
+      printf( "warning: target voltage overshoot! : zwarn\n" );
+      // return immediately in this case, to avoid any further charging of the capacitor
+      return 0;
+    }
+    
+    if( pct_diff >= volt_tolerance ) {
+      // the charging didn't converge, could be due to OC condition on the HV supply.
+      // re-set the supply by turning it off, then turning it back on again
+      converged = 0;
+      
+      zappio_triggerclear_write(1); // make sure we're not in a triggered state that would engage row/col
+      
+      snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV converge retry");
+      printf( "warning: HV supply convergence retry, should be benign : zwarn\n" );
+      
+      /////////// disengage the HV supply and re-engage it to clear any transient OC condition ////////
+      zappio_hv_setting_write(0);  // set supply to zero
+      while( !zappio_hv_ready_read() )
+	;
+      zappio_hv_update_write(1); 
+  
+      zappio_hv_engage_write(0); // disengage the supply
+      zappio_discharge_write(1); // turn on the capacitor discharge resistor
+      wait_until_safe(); // full cycle down
+      
+      delay_ms(250); // give it a fraction of a second to cool down
+      
+      // disconnect fast-discharge resistor, make sure cap is engaged (should already be engaged)
+      zappio_discharge_write(0); 
+      zappio_cap_write(1);
+  
+      //////////// update & re-engage the MKHV supply //////////////
+      zappio_hv_engage_write(1);  // engage the supply before writing, under the theory that the supply is at 0
+  
+      zappio_hv_setting_write(volts_to_hvdac_code((float)voltage));
+      while( !zappio_hv_ready_read() )
+	;
+      zappio_hv_update_write(1); // commit the voltage
+
+      // re-initialize all the loop parameters
+      cur_v = 0.0;
+      zappio_triggerclear_write(1);
+      monitor_depth_write(10);
+      monitor_presample_write(10); // presample == depth will prevent trigger from ever happening
+      
+      elapsed(&acq_timer, -1);
+      start_time = acq_timer;
+    } else {
+      converged = 1;
+    }
+    
+    charge_retry++;
   }
-  
+    
   delay_ms(1);  // wait 1 millisecond longer, this should help improve any convergence/noise gap
 
-  if( pct_diff >= VOLT_TOLERANCE )
+  if( !converged )
     return 1; // timed out
   else
     return 0;
@@ -243,12 +304,8 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
     
     for( c = cstart; c < cend; c++ ) {
 
-      // set the row/col parameters
-      zappio_col_write(1 << c);
-      zappio_row_write(1 << r);
-      last_row = r;
-      last_col = c;
-  
+      zappio_col_write(0); // no row/col selected during main cap charging
+      zappio_row_write(0);
       // now here we would wait until we got to the desired voltage
       // (code to wait until the cap voltage is correct)
       // use the monitor_acquire_write(1) API with a depth of 1 to update the instantaneous ADC readback values
@@ -257,7 +314,14 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
 	status_led = LED_STATUS_RED;
 	printf( "WARNING: timeout waiting for voltage : zwarn" );
       }
+      
       zappio_triggerclear_write(1);
+      
+      // set the row/col parameters
+      zappio_col_write(1 << c);
+      zappio_row_write(1 << r);
+      last_row = r;
+      last_col = c;
   
       // core acquisition/trigger loop
       int acq_timer, start_time;

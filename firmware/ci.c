@@ -270,6 +270,7 @@ void ci_service(void)
 	    if( max_current_code > 0xfff )
 	      max_current_code = 0xfff;
 	  }
+	  printf( "debug: do_zap with max_current_code = %d\n", max_current_code );
 	  do_zap(row, col, voltage, time_us, max_current_code);
 	} else if(strcmp(token, "temp") == 0) {
 	  update_temperature();
