@@ -37,6 +37,7 @@
 #include "plate.h"
 #include "zappy-calibration.h"
 #include "temperature.h"
+#include "zap.h"
 
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
@@ -150,6 +151,22 @@ int main(void) {
   gfxInit();
   oled_logo();
   update_temperature();
+
+
+  // HV subsystem init: make sure the caps/voltages are safe
+  zappio_col_write(0); // no row/col selected
+  zappio_row_write(0);
+  zappio_hv_engage_write(0); // disengage the supply
+  zappio_cap_write(0); // disengage the capacitor
+  zappio_hv_setting_write(0);  // set supply to zero
+  while( !zappio_hv_ready_read() )
+    ;
+  zappio_hv_update_write(1); 
+  zappio_discharge_write(1); // turn on the capacitor discharge resistor
+  wait_until_safe(); // full cycle down
+  
+  zappio_discharge_write(0); // turn off the capacitor discharge resistor
+  
   
   // Setup the Ethernet
   unsigned int ip;
@@ -189,6 +206,7 @@ int main(void) {
 #endif
   status_led = LED_STATUS_GREEN;
 
+  
   int interval;
   elapsed(&interval, -1);
   
