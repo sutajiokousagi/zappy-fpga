@@ -21,7 +21,6 @@
 #include "ethernet.h"
 
 uint32_t wait_until_voltage(uint32_t voltage);
-uint32_t wait_until_safe(void);
 
 uint8_t last_row = 0;
 uint8_t last_col = 0;
@@ -197,11 +196,6 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
   int r, c, rstart, cstart, rend, cend;
   
   telnet_tx = 1;
-  // fundamental hardware modes
-  monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
-  zappio_triggermode_write(0); // use hardware trigger
-  zappio_override_safety_write(0); // set to 1 to bypass lockouts for testing
-  
   snprintf(ui_notifications, sizeof(ui_notifications), "Zap: completed"); // set a defalut "all good" message
   
   if( voltage > 1000 ) {

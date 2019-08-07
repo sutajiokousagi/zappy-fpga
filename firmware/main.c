@@ -153,11 +153,17 @@ int main(void) {
   update_temperature();
 
 
+  // fundamental hardware modes -- used by the global zap control system
+  monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
+  zappio_triggermode_write(0); // use hardware trigger
+  zappio_override_safety_write(0); // set to 1 to bypass lockouts for testing
+
+  
   // HV subsystem init: make sure the caps/voltages are safe
   zappio_col_write(0); // no row/col selected
   zappio_row_write(0);
   zappio_hv_engage_write(0); // disengage the supply
-  zappio_cap_write(0); // disengage the capacitor
+  zappio_cap_write(1); // engage the capacitor
   zappio_hv_setting_write(0);  // set supply to zero
   while( !zappio_hv_ready_read() )
     ;
@@ -166,8 +172,9 @@ int main(void) {
   wait_until_safe(); // full cycle down
   
   zappio_discharge_write(0); // turn off the capacitor discharge resistor
+  zappio_cap_write(0); // disengage the capacitor
   
-  
+
   // Setup the Ethernet
   unsigned int ip;
   microudp_start(mac_addr, my_ip_addr[0], my_ip_addr[1], my_ip_addr[2], my_ip_addr[3]);
@@ -206,7 +213,6 @@ int main(void) {
 #endif
   status_led = LED_STATUS_GREEN;
 
-  
   int interval;
   elapsed(&interval, -1);
   
