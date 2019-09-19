@@ -2,7 +2,7 @@
 #define PROX_FULL_STROKE  28
 #define PROX_CHECK_INTERVAL 80
 
-#define MOTOR_JAM_CURRENT (0.30)
+#define MOTOR_JAM_CURRENT (0.50)
 
 typedef enum {
   platestate_unlocked = 0,
