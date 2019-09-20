@@ -18,3 +18,6 @@
 	path = deps/litedram
 	url = https://github.com/enjoy-digital/litedram.git
 	master = master
+[submodule "deps/lxsocdoc"]
+	path = deps/lxsocdoc
+	url = https://github.com/xobs/lxsocdoc.git

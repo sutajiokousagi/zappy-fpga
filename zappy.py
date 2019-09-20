@@ -45,6 +45,8 @@ from gateware.zappy_i2c import ZappyI2C
 from gateware.oled import OLED
 from gateware.zappio import Zappio
 
+import lxsocdoc
+
 _io = [
     # ADCs
     ("fadc", 0,
@@ -597,6 +599,8 @@ def main():
     builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv", compile_software=compile_software, compile_gateware=compile_gateware)
     vns = builder.build()
     soc.do_exit(vns)
+    lxsocdoc.generate_docs(soc, "build/documentation")
+    lxsocdoc.generate_svd(soc, "build/software")
 
 if __name__ == "__main__":
     main()
