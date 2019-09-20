@@ -15,7 +15,7 @@ void delay_ms(int ms) {
   int timer;
 
   elapsed(&timer, -1); // initialize the timer
-  while( !elapsed(&timer, (SYSTEM_CLOCK_FREQUENCY / 1000) * ms) )
+  while( !elapsed(&timer, (CONFIG_CLOCK_FREQUENCY / 1000) * ms) )
     ;
 }
 

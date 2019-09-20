@@ -404,7 +404,7 @@ class CRG(Module, AutoCSR):
 
 
 boot_offset = 0x1000000
-bios_size = 0x5000
+bios_size = 0x6000
 
 class ZappySoC(SoCCore):
     mem_map = {
@@ -452,6 +452,7 @@ class ZappySoC(SoCCore):
                 spiflash_pads,
                 dummy=spiflash_dummy[spiflash],
                 div=2)
+        self.add_csr("spiflash")
         self.add_constant("SPIFLASH_PAGE_SIZE", 256)
         self.add_constant("SPIFLASH_SECTOR_SIZE", 0x10000)
         self.add_wb_slave(mem_decoder(self.mem_map["spiflash"]), self.spiflash.bus)

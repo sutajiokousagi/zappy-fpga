@@ -13,7 +13,7 @@ static int last_event;
 
 void uptime_service(void)
 {
-	if(elapsed(&last_event, SYSTEM_CLOCK_FREQUENCY)) {
+	if(elapsed(&last_event, CONFIG_CLOCK_FREQUENCY)) {
 		uptime_seconds++;
 	}
 }
@@ -29,7 +29,7 @@ uint32_t uptime_ms(void) {
   if( delta < 0 )
     delta += timer0_reload_read();
   
-  return uptime_seconds * 1000 + (delta / (SYSTEM_CLOCK_FREQUENCY / 1000));
+  return uptime_seconds * 1000 + (delta / (CONFIG_CLOCK_FREQUENCY / 1000));
 }
 
 int uptime(void)

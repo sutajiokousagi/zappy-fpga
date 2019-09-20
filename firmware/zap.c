@@ -75,8 +75,8 @@ uint32_t wait_until_voltage(uint32_t voltage) {
       
       // grab the voltage
       cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
-      //    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/SYSTEM_CLOCK_FREQUENCY), (int) (pct_diff * 100));
-    } while( (pct_diff >= volt_tolerance) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_CHARGE_TIMEOUT) );
+      //    printf( "debug: cur_v = %dmV, delta %dms, pct_diff %d\n", (int) (cur_v * 1000), ((delta)*1000/CONFIG_CLOCK_FREQUENCY), (int) (pct_diff * 100));
+    } while( (pct_diff >= volt_tolerance) && (((delta)*1000/CONFIG_CLOCK_FREQUENCY) < WAIT_CHARGE_TIMEOUT) );
   
     if( pct_diff < -0.01 ) {
       snprintf(ui_notifications, sizeof(ui_notifications), "Zap: HV overshoot");
@@ -175,7 +175,7 @@ uint32_t wait_until_safe(void) {
 
     // grab the voltage
     cur_v = convert_code(data[0], ADC_SLOW); // index 0 is slow, index 1 is fast
-  } while( ((cur_v > SAFE_THRESH) || (mk_v > SAFE_THRESH)) && (((delta)*1000/SYSTEM_CLOCK_FREQUENCY) < WAIT_TIMEOUT) );
+  } while( ((cur_v > SAFE_THRESH) || (mk_v > SAFE_THRESH)) && (((delta)*1000/CONFIG_CLOCK_FREQUENCY) < WAIT_TIMEOUT) );
   
   if( cur_v > SAFE_THRESH ) {
     snprintf(ui_notifications, sizeof(ui_notifications), "Zap: main cap unsafe %dV", (int) cur_v);
@@ -349,7 +349,7 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
       zappio_col_write(0); // no row/col selected
       zappio_row_write(0);
 
-      printf("Acquisition finished in %d ticks or %d ms. Overrun status: %d : zinfo\n", delta, (delta)*1000/SYSTEM_CLOCK_FREQUENCY,
+      printf("Acquisition finished in %d ticks or %d ms. Overrun status: %d : zinfo\n", delta, (delta)*1000/CONFIG_CLOCK_FREQUENCY,
 	     monitor_overrun_read());
 
       // capacitor charges while the upload happens

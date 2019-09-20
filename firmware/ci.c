@@ -203,7 +203,7 @@ void ci_service(void)
 	  i = stop - start;
 	  if( i < 0 ) i += timer0_reload_read();
 	  printf("Elapsed ticks for log upload: %d, or %dms for %d bytes\n",
-		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY, depth*4);
+		 i, (i)*1000/CONFIG_CLOCK_FREQUENCY, depth*4);
 #if 0
 	} else if(strcmp(token, "benchmark") == 0) {
 	  // send up 1 megabyte of data to benchmark upload speed
@@ -220,7 +220,7 @@ void ci_service(void)
 	  i = stop - start;
 	  if( i < 0 ) i += timer0_reload_read();
 	  printf("Elapsed ticks for 1MiB: %d, or %dms per megabyte\n",
-		 i, (i)*1000/SYSTEM_CLOCK_FREQUENCY);
+		 i, (i)*1000/CONFIG_CLOCK_FREQUENCY);
 #endif
 #if 0	   // for the memtester module, leave this around until we've validated the ADC capture memory module
 	} else if(strcmp(token, "seed") == 0) {
@@ -235,7 +235,7 @@ void ci_service(void)
 	} else if(strcmp(token, "acquire") == 0) {
 	  int acq_timer, start_time;
 	  printf("Testing acquisition with depth %d\n", depth);
-	  monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
+	  monitor_period_write(CONFIG_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
 	  monitor_depth_write(depth);
 	  elapsed(&acq_timer, -1);
 	  start_time = acq_timer;
@@ -248,7 +248,7 @@ void ci_service(void)
 	  int delta = acq_timer - start_time;
 	  if( delta < 0 )
 	    delta += timer0_reload_read();
-	  printf("Acquisition finished in %d ticks or %d ms. Overrun status: %d\n", delta, (delta)*1000/SYSTEM_CLOCK_FREQUENCY,
+	  printf("Acquisition finished in %d ticks or %d ms. Overrun status: %d\n", delta, (delta)*1000/CONFIG_CLOCK_FREQUENCY,
 		 monitor_overrun_read());
 	  printf("Run 'upload' to get a copy of the data\n");
 	} else if(strcmp(token, "zap") == 0) {

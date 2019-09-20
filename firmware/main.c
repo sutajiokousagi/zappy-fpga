@@ -143,8 +143,8 @@ int main(void) {
 
   // initialize buzzer PWM frequency and make sure it's off
   buzzpwm_enable_write(0);
-  buzzpwm_period_write(SYSTEM_CLOCK_FREQUENCY / 3100);
-  buzzpwm_width_write( (SYSTEM_CLOCK_FREQUENCY / 3100) / 2 );
+  buzzpwm_period_write(CONFIG_CLOCK_FREQUENCY / 3100);
+  buzzpwm_width_write( (CONFIG_CLOCK_FREQUENCY / 3100) / 2 );
 
   oproxInit();
 
@@ -154,7 +154,7 @@ int main(void) {
 
 
   // fundamental hardware modes -- used by the global zap control system
-  monitor_period_write(SYSTEM_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
+  monitor_period_write(CONFIG_CLOCK_FREQUENCY / 1000000); // shoot for 1 microsecond period
   zappio_triggermode_write(0); // use hardware trigger
   zappio_override_safety_write(0); // set to 1 to bypass lockouts for testing
 
@@ -217,7 +217,7 @@ int main(void) {
   elapsed(&interval, -1);
   
   while(1) {
-    if( elapsed(&interval, SYSTEM_CLOCK_FREQUENCY / 2) ) { // twice a second update the temperature
+    if( elapsed(&interval, CONFIG_CLOCK_FREQUENCY / 2) ) { // twice a second update the temperature
       update_temperature();
     }
     uptime_service();

@@ -631,8 +631,8 @@ void microudp_start(const unsigned char *macaddr, unsigned char ip0, unsigned ch
 	txbuffer1 = (ethernet_buffer *)(ETHMAC_BASE + 3*ETHMAC_SLOT_SIZE);
 	
 	/* uip periods */
-	uip_periodic_period = SYSTEM_CLOCK_FREQUENCY/100; /*  10 ms */
-	uip_arp_period = SYSTEM_CLOCK_FREQUENCY/10;       /* 100 ms */
+	uip_periodic_period = CONFIG_CLOCK_FREQUENCY/100; /*  10 ms */
+	uip_arp_period = CONFIG_CLOCK_FREQUENCY/10;       /* 100 ms */
 
 	/* init uip */
 	process_init();
@@ -721,7 +721,7 @@ static void busy_wait(unsigned int ds)
 {
 	timer0_en_write(0);
 	timer0_reload_write(0);
-	timer0_load_write(SYSTEM_CLOCK_FREQUENCY/10*ds);
+	timer0_load_write(CONFIG_CLOCK_FREQUENCY/10*ds);
 	timer0_en_write(1);
 	timer0_update_value_write(1);
 	while(timer0_value_read()) timer0_update_value_write(1);
