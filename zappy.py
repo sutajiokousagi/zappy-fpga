@@ -575,7 +575,16 @@ def main():
     parser.add_argument(
         "-t", "--target", help="which FPGA board to build for", choices=["zappy", "netv2"], default="zappy"
     )
+    parser.add_argument(
+        "-D", "--document-only", default=False, action="store_true", help="Build docs only"
+    )
     args = parser.parse_args()
+    compile_gateware = True
+    compile_software = True
+
+    if args.document_only:
+        compile_gateware = False
+        compile_software = False
 
     if args.target == "zappy":
         platform = Platform()
@@ -585,7 +594,7 @@ def main():
         exit(1)
 
     soc = ZappySoC(platform)
-    builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv")
+    builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv", compile_software=compile_software, compile_gateware=compile_gateware)
     vns = builder.build()
     soc.do_exit(vns)
 
