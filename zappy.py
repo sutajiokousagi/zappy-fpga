@@ -534,6 +534,7 @@ class ZappySoC(SoCCore):
         self.add_interrupt("monitor")
 
         self.comb += self.zappio.trigger.eq(self.monitor.ext_trigger) # wire up the hardware trigger based on the presampler timeout
+        self.comb += self.zappio.energy_cutoff.eq(self.monitor.energy_cutoff) # wire up the energy cutoff signal
         self.comb += self.buzzpwm.hardware_ena.eq(self.zappio.hv_engage_gpio) # wire up buzzer to beep whenever HV is engaged
         self.comb += self.zappio.delta.eq(self.monitor.livedelta) # wire up the delta computation from the monitor
 

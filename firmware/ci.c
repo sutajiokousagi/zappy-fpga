@@ -185,9 +185,6 @@ void ci_service(void)
 	  ci_help();
 	  wputs("");
 	} else if(strcmp(token, "reboot") == 0) reboot();
-	else if(strcmp(token, "mr") == 0) mr(get_token(&str), get_token(&str));
-	else if(strcmp(token, "mw") == 0) mw(get_token(&str), get_token(&str), get_token(&str));
-	else if(strcmp(token, "mc") == 0) mc(get_token(&str), get_token(&str), get_token(&str));
 	else if(strcmp(token, "uptime") == 0)
 	  uptime_print();
 	else if(strcmp(token, "upload") == 0) {
@@ -257,6 +254,7 @@ void ci_service(void)
 	  uint32_t voltage = strtoul(get_token(&str), NULL, 0);
 	  uint32_t time_us = strtoul(get_token(&str), NULL, 0);
 	  int32_t max_current_ma = strtol(get_token(&str), NULL, 0); // max_current in mA
+	  uint32_t energy_cutoff = strtoul(get_token(&str), NULL, 0); // energy cutoff in counts
 	  // turn current into a voltage by multiplying it by capres
 	  float max_voltage = (((float) max_current_ma) / 1000.0) * zappy_cal.capres;
 	  if( max_voltage > 1000.0 ) 
@@ -271,7 +269,11 @@ void ci_service(void)
 	      max_current_code = 0xfff;
 	  }
 	  printf( "debug: do_zap with max_current_code = %d\n", max_current_code );
-	  do_zap(row, col, voltage, time_us, max_current_code);
+	  do_zap(row, col, voltage, time_us, max_current_code, energy_cutoff);
+	} else if(strcmp(token, "energy") == 0) {
+	  // readout energy accumulated, in hex, formatted for easy python telnetlib parsing
+	    printf( "\n0x%02x%08x : energy\n", (unsigned int) (monitor_energy_accumulator_read() >> 32),
+		    (unsigned int) monitor_energy_accumulator_read() );
 	} else if(strcmp(token, "temp") == 0) {
 	  update_temperature();
 	  print_temperature();

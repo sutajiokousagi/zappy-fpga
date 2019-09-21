@@ -186,6 +186,45 @@ class Zappy_adc(Module, AutoCSR):
         self.delta = CSRStatus(16)
         self.livedelta = Signal(16)
 
+        # coefficient is roughly 1.69*10^-9 joules per LSB
+        # max possible energy is 10 Joules, so max count is approx 5.9 billion -- longer than a 32 bit number
+        self.energy_accumulator = CSRStatus(fields=[
+            CSRField("energy", size=40, description="Energy accumulated during the pulse")
+        ])
+        self.energy_threshold = CSRStorage(fields=[
+            CSRField("threshold", size=40, description="Energy cutoff for zap")
+        ])
+        self.energy_control = CSRStorage(fields = [
+            CSRField("enable", size=1, description="Use energy cutoff to terminate a zap"),
+            CSRField("reset", size=1, description="Reset the energy accumulator", pulse=1),
+        ])
+        energy_accumulate = Signal() # gate the accumulator on, must be a single cycle pulse
+        fadc_reg = Signal(12)
+        sadc_reg = Signal(12)
+        self.energy_cutoff  = Signal()  # cut off the zap because energy is past the threshold
+        self.sync += [
+            If(self.energy_control.fields.reset,
+               self.energy_accumulator.fields.energy.eq(0)
+            ).Else(
+                If(energy_accumulate,
+                   self.energy_accumulator.fields.energy.eq(self.energy_accumulator.fields.energy + ((sadc_reg - fadc_reg) * (sadc_reg)) )
+                ).Else(
+                    self.energy_accumulator.fields.energy.eq(self.energy_accumulator.fields.energy)
+                )
+            ),
+            If(self.energy_control.fields.enable,
+                If( (self.energy_threshold.fields.threshold < self.energy_accumulator.fields.energy) &
+                    (self.energy_accumulator.fields.energy[self.energy_accumulator.fields.energy.nbits - 1] == 0), # only trigger if energy is not negative
+                  # note: negative energy can happen due to static offsets at low energy levels
+                  self.energy_cutoff.eq(1)
+                ).Else(
+                  self.energy_cutoff.eq(0)
+               )
+            ).Else(
+                self.energy_cutoff.eq(0),
+            )
+        ]
+
         # also generate a convenience interrupt when status is done, if interrupt is enabled
         self.submodules.ev = EventManager()
         self.ev.acquisition_done = EventSourcePulse()
@@ -244,7 +283,9 @@ class Zappy_adc(Module, AutoCSR):
         fsm.act("WAITVALID", # wait for ADC to present valid data, then copy it to the data register
                 NextValue(pulsetimer, 0), # reset the pulse timer in case we loop back to ACQUIRE state without going through IDLE
                 If(adc_valid_sync & fadc_valid_sync,
-                   NextValue(data, Cat(self.adc.data, zeropad, self.fadc.data, zeropad)),
+                   NextValue(data, Cat(self.adc.data, zeropad, self.fadc.data, zeropad)), # stable copy for RAM
+                   NextValue(fadc_reg, self.fadc.data),  # also make a copy for the energy accumulator
+                   NextValue(sadc_reg, self.adc.data),
                    NextValue(self.cur_adc.status, self.adc.data),
                    NextValue(self.cur_fadc.status, self.fadc.data),
                    NextValue(self.adc.ready, 0),
@@ -267,7 +308,7 @@ class Zappy_adc(Module, AutoCSR):
                 ),
                 # note the statement above is >=, so if sampletimer starts below period, the next
                 # statement won't happen and the overrun will be 0
-                # this statemen runs in parallel with the above statement.
+                # this statement runs in parallel with the above statement.
                 If(sampletimer > (self.period.storage-2),
                    NextValue(self.overrun.status, sampletimer - self.period.storage)
                 ).Else(
@@ -276,8 +317,9 @@ class Zappy_adc(Module, AutoCSR):
         )
         fsm.act("INCREMENT", # single cycle in sysclk
                 If(count < (self.depth.storage - self.presample.storage),
-                   self.ext_trigger.eq(1),
-                ),
+                     self.ext_trigger.eq(1),
+                     energy_accumulate.eq(1),
+                   ),
                 NextValue(count, count - 1),
                 NextValue(adr, adr + 1),
                 If(count != 0,

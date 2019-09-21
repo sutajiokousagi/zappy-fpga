@@ -49,6 +49,8 @@ class Zappio(Module, AutoCSR):
         self.scram_status = CSRStatus(1)
         self.comb += self.scram_status.status.eq(myscram)
 
+        self.energy_cutoff = Signal()  # the "enable" of this is handled in the monitor block, this signal is interpreted without modifiers here
+
         # hvengage
         self.hv_engage = CSRStorage(1)
         self.hv_engage_gpio = hv_engage_gpio = getattr(pads, "hv_engage")
@@ -85,7 +87,7 @@ class Zappio(Module, AutoCSR):
         ]
         self.comb += [
             mytrigger.eq( (triggerlatch & ~self.triggermode.storage) | (self.triggersoft.storage & self.triggermode.storage) ),
-            If(myscram | ~mytrigger,
+            If( (myscram | ~mytrigger | self.energy_cutoff),
                row_gpio.eq(0),
                col_gpio.eq(0),
             ).Else(

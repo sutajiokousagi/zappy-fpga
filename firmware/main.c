@@ -42,7 +42,7 @@
 unsigned char mac_addr[6] = {0x13, 0x37, 0x32, 0x0d, 0xba, 0xbe};
 unsigned char my_ip_addr[4] = {10, 0, 11, 2}; // my IP address
 unsigned char host_ip_addr[4] = {10, 0, 11, 3}; // host IP address
-const cal_record zappy_cal = {HOSTNAME, FAST_M, FAST_B, SLOW_M, SLOW_B, P5V_ADC, P5V_ADC_LOGIC, FS_DAC, HVDAC_M, HVDAC_B, CAPRES};
+const cal_record zappy_cal = {HOSTNAME, FAST_M, FAST_B, SLOW_M, SLOW_B, P5V_ADC, P5V_ADC_LOGIC, FS_DAC, HVDAC_M, HVDAC_B, CAPRES, ENERGY_COEFF, ONEJOULE};
 
 /* Local TFTP client port (arbitrary) */
 #define PORT_IN		7642

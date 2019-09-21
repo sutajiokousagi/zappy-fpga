@@ -192,7 +192,7 @@ uint32_t wait_until_safe(void) {
 }
 
 // depth is equivalent to time in microseconds (each sample is one microsecond)
-int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16_t max_current_code) {
+int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16_t max_current_code, uint32_t energy_cutoff) {
   int r, c, rstart, cstart, rend, cend;
   
   telnet_tx = 1;
@@ -310,6 +310,16 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
       }
       
       zappio_triggerclear_write(1);
+
+      if( energy_cutoff == 0 ) { // don't use energy cutoff, but still monitor
+	monitor_energy_control_write(1 << CSR_MONITOR_ENERGY_CONTROL_RESET_OFFSET);
+      } else {
+	// setup energy control
+	monitor_energy_threshold_write((unsigned long long int) energy_cutoff);
+	monitor_energy_control_write(1 << CSR_MONITOR_ENERGY_CONTROL_ENABLE_OFFSET |
+				     1 << CSR_MONITOR_ENERGY_CONTROL_RESET_OFFSET);
+	printf( "Energy control debug: thresh %d, ctl %x\n", (uint32_t) monitor_energy_threshold_read(), monitor_energy_control_read());
+      }
       
       // set the row/col parameters
       zappio_col_write(1 << c);
@@ -360,6 +370,13 @@ int32_t do_zap(uint8_t row, uint8_t col, uint32_t voltage, uint32_t depth, int16
       // send the data dump
       snprintf(fname, sizeof(fname), "zappy-log.r%dc%d", r+1, c+1);
       tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, fname, (void *)MONITOR_BASE, depth*4);
+      
+      // and store the measured energy of the run
+      char energy[32];
+      snprintf(fname, sizeof(fname), "zappy-energy.r%dc%d", r+1, c+1);
+      snprintf(energy, sizeof(energy), "%02x%08x\n", (unsigned int) (monitor_energy_accumulator_read() >> 32),
+	       (unsigned int) monitor_energy_accumulator_read());
+      tftp_put(ip, DEFAULT_TFTP_SERVER_PORT, fname, (void *)energy, strlen(energy));
       
       // update the UI
       oled_ui();

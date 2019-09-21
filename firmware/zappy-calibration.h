@@ -14,6 +14,8 @@ typedef struct _cal_record {
   float hvdac_m;
   float hvdac_b;
   float capres;
+  float energy_coeff;
+  float onejoule;
 } cal_record;
 
 extern const cal_record zappy_cal;
@@ -68,6 +70,8 @@ fast: 0.16229V
 #define HVDAC_M 6556.4623
 #define HVDAC_B 201.1304
 #define CAPRES  46.79   // ohms, measured at 27.5C
+#define ENERGY_COEFF 0.000000001691356 // joules per LSB of accumulated energy
+#define ONEJOULE 591241583.67  // one joule of accumulated energy in LSBs
 #endif
 
 
