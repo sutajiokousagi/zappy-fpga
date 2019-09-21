@@ -206,8 +206,8 @@ class Zappy_adc(Module, AutoCSR):
             If(self.energy_control.fields.reset,
                self.energy_accumulator.fields.energy.eq(0)
             ).Else(
-                If(energy_accumulate,
-                   self.energy_accumulator.fields.energy.eq(self.energy_accumulator.fields.energy + ((sadc_reg - fadc_reg) * (sadc_reg)) )
+                If(energy_accumulate & (sadc_reg > fadc_reg), # negative results are due to small static offsets, causes instability problems if we sume them in
+                   self.energy_accumulator.fields.energy.eq(self.energy_accumulator.fields.energy + ((sadc_reg - fadc_reg) * (fadc_reg)) )
                 ).Else(
                     self.energy_accumulator.fields.energy.eq(self.energy_accumulator.fields.energy)
                 )
