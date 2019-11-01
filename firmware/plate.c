@@ -155,7 +155,7 @@ uint32_t plate_unlock(void) {
 
   motor_current = iqReadAmps();
   if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
-    buzzpwm_enable_write(1); // sound an alarm
+    // buzzpwm_enable_write(1); // sound an alarm
     printf("unlock jam : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: JAM");
     status_led = LED_STATUS_RED;
@@ -169,7 +169,7 @@ uint32_t plate_unlock(void) {
     cur_angle = -cur_angle;
 
   if( cur_angle > 1.57 ) { // more than half a rotation from the home angle
-    buzzpwm_enable_write(1); // sound an alarm
+    // buzzpwm_enable_write(1); // sound an alarm
     pstate = platestate_error;
     printf("homing fail : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: homing fail");
