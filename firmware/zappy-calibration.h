@@ -59,7 +59,7 @@ fast: 0.11597V
 slow: 0.15212V
 fast: 0.16229V
  */
-#define HOSTNAME  "zappy-01 c"
+#define HOSTNAME  "zappy-01 d"
 #define FAST_M  230.156015 // 215.7720466   // resistor updated to 11.335k for exact gain matching on fast/slow paths
 #define FAST_B  0.176922133 //-0.0488699
 #define SLOW_M  229.9235716
