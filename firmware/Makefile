@@ -1,5 +1,8 @@
 ZAPPY_DIR=../build
 
+# note to self: make SERIAL_NUMBER=-DZAPPY_SERIAL=2
+SERIAL_NUMBER=-DZAPPY_SERIAL=1
+
 include $(ZAPPY_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
@@ -26,7 +29,7 @@ OBJECTS=	isr.o \
 #                assets/rawdata.o \
 
 # prepend our local files to override system ones
-CFLAGS := -I. $(CFLAGS) -fdata-sections -ffunction-sections
+CFLAGS := -I. $(CFLAGS) -fdata-sections -ffunction-sections $(SERIAL_NUMBER)
 
 # UIP enables telnet but adds about 25kiB
 # after changing, need to do a make clean.
