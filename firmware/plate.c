@@ -43,6 +43,7 @@ uint32_t plate_present(void) {
 uint32_t plate_home(void) {
   float cur_angle = 0.0;
   int i;
+  float motor_current = 0.0;
 
   iqSetCoast();
   coast_current = iqReadAmps();
@@ -57,6 +58,17 @@ uint32_t plate_home(void) {
     iqSetAngle(6.28 * (float) i + cur_angle, 500);
     delay(600);
     i++;
+    
+    motor_current = iqReadAmps();
+    if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
+      iqSetCoast();
+      snprintf(ui_notifications, sizeof(ui_notifications), "Home: motor open jam (%d)\n", i);
+      printf( "Homing motor open jam detected at rotation %d : zerr\n", i );
+      status_led = LED_STATUS_RED;
+      pstate = platestate_error;
+      homed = 0;
+      return 0;
+    }
   }
 
   delay(100);
@@ -69,6 +81,17 @@ uint32_t plate_home(void) {
     iqSetAngle( cur_angle - (0.1 * (float) i), 10);
     delay(20);
     i++;
+    
+    motor_current = iqReadAmps();
+    if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
+      iqSetCoast();
+      snprintf(ui_notifications, sizeof(ui_notifications), "Home: motor close jam (%d)\n", i);
+      printf( "Homing motor close jam detected at rotation %d : zerr\n", i );
+      status_led = LED_STATUS_RED;
+      pstate = platestate_error;
+      homed = 0;
+      return 0;
+    }
   }
 
   delay(100);
@@ -90,8 +113,13 @@ uint32_t plate_lock(void) {
   
   telnet_tx = 1;
   if( !homed ) {
-    plate_home();
-    homed = 1;
+    if(plate_home()) {
+      homed = 1;
+    } else {
+      homed = 0;
+      telnet_tx = 0;
+      return 0;
+    }
   }
   
   if( plate_present() ) {
@@ -102,6 +130,7 @@ uint32_t plate_lock(void) {
       motor_current = iqReadAmps();
       // printf( "motor current: %dmA\n", motor_current * 1000.0 );
       if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
+	iqSetCoast();
 	snprintf(ui_notifications, sizeof(ui_notifications), "Lock: motor jam (%d)\n", i);
 	printf( "Motor jam detected at rotation %d : zerr\n", i );
 	status_led = LED_STATUS_RED;
@@ -146,8 +175,13 @@ uint32_t plate_unlock(void) {
   
   telnet_tx = 1;
   if( !homed ) {
-    plate_home();
-    homed = 1;
+    if(plate_home()) {
+      homed = 1;
+    } else {
+      homed = 0;
+      telnet_tx = 0;
+      return 0;
+    }
   }
   
   iqSetAngle(home_angle, 1000);
@@ -156,6 +190,7 @@ uint32_t plate_unlock(void) {
   motor_current = iqReadAmps();
   if( motor_current > (MOTOR_JAM_CURRENT + coast_current) ) {
     // buzzpwm_enable_write(1); // sound an alarm
+    iqSetCoast();
     printf("unlock jam : zerr\n");
     snprintf(ui_notifications, sizeof(ui_notifications), "Unlock: JAM");
     status_led = LED_STATUS_RED;

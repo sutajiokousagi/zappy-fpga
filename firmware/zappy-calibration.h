@@ -79,7 +79,7 @@ fast: 0.16229V
 /*
 Calibration curve measurements (serial #2): see "calibration-curves-02.ods" in ginkgo/zappy/zappy-02 folder
  */
-#define HOSTNAME  "zappy-02 a"
+#define HOSTNAME  "zappy-02 b"
 #define FAST_M  234.4041068  // after trimming to net 11615 ohms
 #define FAST_B  -0.212569193
 #define SLOW_M  233.9474241

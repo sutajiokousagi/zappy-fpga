@@ -206,9 +206,11 @@ int main(void) {
   snprintf(ui_notifications, sizeof(ui_notifications), "Homing the cams...\n");
   oled_ui();
   
-  plate_home();
-  
-  snprintf(ui_notifications, sizeof(ui_notifications), "Plate cam homed.\n");
+  if(plate_home()) {
+    snprintf(ui_notifications, sizeof(ui_notifications), "Plate cam homed.\n");
+  } else {
+    snprintf(ui_notifications, sizeof(ui_notifications), "Error in homing!.\n");
+  }
   oled_ui();
 #endif
   status_led = LED_STATUS_GREEN;
